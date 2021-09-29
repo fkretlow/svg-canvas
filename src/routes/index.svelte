@@ -1,31 +1,59 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { SVGCanvas } from "$lib/SVGCanvas";
+    import { EventBus, EventReceiver } from "$lib/events";
     import { Model } from "$lib/model";
-    import { wait } from "$lib/util";
+    import { wait, randint, makeRandomRectangle } from "$lib/util";
 
-    const model = new Model();
-
-    model.add({ x: 20, y: 50, width: 100, height: 30 });
+    let bus: EventBus;
+    let receiver: EventReceiver;
+    let model: Model;
     let canvas: SVGCanvas;
+
 
     let main: HTMLElement;
     onMount(() => {
+        bus = new EventBus();
+
+        model = new Model();
+        bus.registerSource(model);
+
         canvas = new SVGCanvas(main, {
             styles: {
-                "width": "1000px",
-                "height": "800px",
-                "background-color": "#edc",
-                "border": "1px solid black",
+                width: "100%",
+                height: "100%",
             }
         });
-        canvas.setData(model.rectangles).update();
 
-        wait(1000).then(() => {
-            model.add({ x: 100, y: 533, width: 30, height: 20 });
-        }).then(() => {
-            canvas.update();
-        })
+        canvas.setData(model.rectangles);
+
+        canvas.on("drop", (event: IEvent) => {
+            const { id, position } = event.detail;
+            model.move(id, position);
+        });
+
+        canvas.on("click", (event: IEvent) => {
+            const { id, altKey } = event.detail;
+            if (altKey) {
+                model.delete(id);
+            } else {
+                model.changeColor(id);
+            }
+        });
+
+        receiver = new EventReceiver();
+        bus.registerListener(receiver);
+
+        receiver.on("item-added",   () => canvas.update());
+        receiver.on("item-deleted", () => canvas.update());
+        receiver.on("item-moved",   () => canvas.update());
+        receiver.on("item-resized", () => canvas.update());
+        receiver.on("item-edited",  () => canvas.update());
+
+        wait(1000).then(() => model.add(makeRandomRectangle()));
+        wait(2000).then(() => model.add(makeRandomRectangle()));
+        wait(3000).then(() => model.add(makeRandomRectangle()));
+        wait(4000).then(() => model.add(makeRandomRectangle()));
     });
 </script>
 

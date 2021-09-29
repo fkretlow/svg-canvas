@@ -15,5 +15,31 @@ interface ISize {
     height: number;
 }
 
-interface IRectangle extends IPoint, ISize {}
+interface IRectangle extends IPoint, ISize {
+    color: string;
+}
 
+
+type TEventType = string;
+type TEventDetail = any;
+interface IEvent {
+    type: TEventType;
+    detail?: TEventDetail;
+}
+
+type TEventDispatcher = ((type: TEventType, detail?: TEventDetail) => void);
+
+interface IEventSource {
+    setEventDispatcher(dispatcher: TEventDispatcher): void;
+    removeEventDispatcher(): void;
+    eventTypes?: {
+        sending?: Set<TEventType>,
+    };
+}
+
+interface IEventListener {
+    notify(event: IEvent): any;
+    eventTypes?: {
+        receiving?: Set<TEventType>,
+    };
+}
