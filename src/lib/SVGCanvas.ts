@@ -1,5 +1,5 @@
 export interface ISVGCanvas {
-    setData(data: Iterable<ISVGCanvasSourceItem>): ISVGCanvas;
+    setTruth(data: Iterable<ISVGCanvasSourceItem>): ISVGCanvas;
     update(): ISVGCanvas;
     select(id: TId): ISVGCanvas;
 }
@@ -35,7 +35,7 @@ export class SVGCanvas implements ISVGCanvas {
         if (parent) this.mount(parent);
     }
 
-    private data: Iterable<ISVGCanvasSourceItem> | null = null;
+    private truth: Iterable<ISVGCanvasSourceItem> | null = null;
     private readonly items = new Map<TId, SVGItem>();
     private readonly svg: SVGElement;
     private eventHandlers = new Map<string, Function>();
@@ -75,19 +75,19 @@ export class SVGCanvas implements ISVGCanvas {
         return this;
     }
 
-    public setData(data: Iterable<ISVGCanvasSourceItem>): SVGCanvas {
-        this.data = data;
+    public setTruth(data: Iterable<ISVGCanvasSourceItem>): SVGCanvas {
+        this.truth = data;
         return this;
     }
 
     public update(): SVGCanvas {
-        if (!this.data) throw new Error(`SVGCanvas.update: no data`);
-        const dataIds = new Set<TId>();
-        for (let item of this.data) dataIds.add(item.id);
+        if (!this.truth) throw new Error(`SVGCanvas.update: no truth`);
+        const truthIds = new Set<TId>();
+        for (let item of this.truth) truthIds.add(item.id);
 
         // delete all deleted
         for (let id of this.items.keys()) {
-            if (!dataIds.has(id)) {
+            if (!truthIds.has(id)) {
                 const item = this.items.get(id);
                 item.unmount();
                 this.items.delete(id);
@@ -98,9 +98,9 @@ export class SVGCanvas implements ISVGCanvas {
         for (let item of this.items.values()) item.update();
 
         // add all new
-        for (let source of this.data) {
-            if (!this.items.has(source.id)) {
-                const item = new SVGItem(source);
+        for (let part of this.truth) {
+            if (!this.items.has(part.id)) {
+                const item = new SVGItem(part);
                 this.setupItemEventHandlers(item);
                 this.items.set(item.id, item);
                 item.mount(this.svg);
@@ -157,15 +157,15 @@ export class SVGCanvas implements ISVGCanvas {
 
 
 class SVGItem {
-    constructor(source: ISVGCanvasSourceItem) {
+    constructor(truth: ISVGCanvasSourceItem) {
         this.element = this.createRectElement();
         this.setupEventListeners();
-        this.source = source;
+        this.truth = truth;
         this.update();
     }
 
     private readonly element: SVGRectElement;
-    private readonly source: ISVGCanvasSourceItem;
+    private readonly truth: ISVGCanvasSourceItem;
     private eventHandlers: Map<string, TMouseEventHandler> = new Map();
 
     private createRectElement(): SVGRectElement {
@@ -195,11 +195,11 @@ class SVGItem {
     }
 
     public update(): SVGItem {
-        this.x = this.source.x;
-        this.y = this.source.y;
-        this.width = this.source.width;
-        this.height = this.source.height;
-        this.color = this.source.color;
+        this.x = this.truth.x;
+        this.y = this.truth.y;
+        this.width = this.truth.width;
+        this.height = this.truth.height;
+        this.color = this.truth.color;
         return this;
     }
 
@@ -225,48 +225,48 @@ class SVGItem {
         return this;
     }
 
-    public get id(): TId { return this.source.id; }
+    public get id(): TId { return this.truth.id; }
 
     private _x: number = 0;
     public get x(): number { return this._x; }
     public set x(x: number) {
         this._x = x
-        this.element.setAttribute("x", `${x}`);
+        this.element.style.setProperty("x", `${x}px`);
     }
 
     private _y: number = 0;
     public get y(): number { return this._y; }
     public set y(y: number) {
         this._y = y
-        this.element.setAttribute("y", `${y}`);
+        this.element.style.setProperty("y", `${y}px`);
     }
 
     private _width: number = 0;
     public get width(): number { return this._width; }
     public set width(width: number) {
         this._width = width
-        this.element.setAttribute("width", `${width}`);
+        this.element.style.setProperty("width", `${width}px`);
     }
 
     private _height: number = 0;
     public get height(): number { return this._height; }
     public set height(height: number) {
         this._height = height
-        this.element.setAttribute("height", `${height}`);
+        this.element.style.setProperty("height", `${height}px`);
     }
 
     private _color: string = "transparent";
     public get color(): string { return this._color; }
     public set color(color: string) {
         this._color = color;
-        this.element.setAttribute("fill", color);
+        this.element.style.setProperty("fill", color);
     }
 
     public get parentId(): TId | null {
-        try { return this.source.parentId; } catch { return null; }
+        try { return this.truth.parentId; } catch { return null; }
     }
 
     public get childIds(): Iterable<TId> | null {
-        try { return this.source.childIds; } catch { return null; }
+        try { return this.truth.childIds; } catch { return null; }
     }
 }

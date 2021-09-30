@@ -3,7 +3,7 @@
     import { SVGCanvas } from "$lib/SVGCanvas";
     import { EventBus, EventReceiver } from "$lib/events";
     import { Model } from "$lib/model";
-    import { wait, randint, makeRandomRectangle } from "$lib/util";
+    import { wait, makeRandomRectangle } from "$lib/util";
 
     let bus: EventBus;
     let receiver: EventReceiver;
@@ -25,7 +25,7 @@
             }
         });
 
-        canvas.setData(model.rectangles);
+        canvas.setTruth(model.rectangles);
 
         canvas.on("drop", (event: IEvent) => {
             const { id, position } = event.detail;
