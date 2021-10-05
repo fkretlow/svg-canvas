@@ -1,21 +1,16 @@
-import {
-    CanvasItem,
-    ICanvasRectangle,
-    INamedCanvasItem,
-    TCanvasItemGetter,
-    TMouseEventHandler,
-} from "./CanvasItem";
+import { CanvasItem } from "./CanvasItem";
 import { createSVGElement } from "./../util";
 
 
 export class CanvasSnippet
 extends CanvasItem
 implements ICanvasRectangle, INamedCanvasItem {
-    constructor(getItem: TCanvasItemGetter, truth: ISVGCanvasSourceItem) {
+    constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem, truth);
         this._rectElement = this.createRectElement();
         this._nameElement = this.createNameElement();
         this._rectElement.appendChild(this._nameElement);
+        this.setupEventListeners();
         this.update();
     }
 
@@ -27,6 +22,17 @@ implements ICanvasRectangle, INamedCanvasItem {
         return createSVGElement("text") as SVGTextElement;
     }
 
+    private setupEventListeners(): void {
+        // TODO: Do this properly...
+        const types = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
+        types.forEach(type => {
+            this._rectElement.addEventListener(type, (e: MouseEvent) => {
+                const handlers = this.eventTargetMixin.getHandlers(type);
+                handlers?.forEach(handler => handler(e));
+            });
+        })
+    }
+
     public update(): CanvasSnippet {
         this.x = this.truth.x;
         this.y = this.truth.y;
@@ -36,6 +42,9 @@ implements ICanvasRectangle, INamedCanvasItem {
         this.name = this.truth.name;
         return this;
     }
+
+    public select(): CanvasSnippet { return this; }
+    public css(styles: TCSSStylesCollection): CanvasSnippet { return this; }
 
     public destroy(): void {
         this.extractFromContainer();

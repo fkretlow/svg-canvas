@@ -44,13 +44,26 @@ interface IEventListener {
     };
 }
 
+interface IEventTarget {
+    on(type: TEventType, handler: Function): any;
+    off(type: TEventType, handler?: Function): any;
+}
+
+interface IEventTargetMixin extends IEventTarget {
+    emitEvent(type: TEventType, detail?: TEventDetail): Promise<void>;
+}
+
 type TMouseEventHandler = ((e: MouseEvent) => any);
 type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
 
 interface ICanvas {
     setTruth(data: Iterable<ICanvasSourceItem>): ICanvas;
-    update(): ICanvas;
-    select(id: TId): ICanvas;
+    mount(parent: HTMLElement): ICanvas;
+    unmount(): ICanvas;
+    update(ids: Iterable<TId>): ICanvas;
+    delete(ids: Iterable<TId>): ICanvas;
+    select(ids: Iterable<TId>): ICanvas;
+    setOptions(options: Partial<ICanvasOptions>): ICanvas;
 }
 
 
@@ -72,7 +85,31 @@ interface ICanvasOptions {
 }
 
 
-interface ICanvasContainer extends ICanvasItem {
+interface ICanvasItem {
+    readonly id: TId;
+    parentId: TId | null;
+
+    readonly element: SVGElement;
+
+    mount(parent: SVGElement): ICanvasItem;
+    unmount(): ICanvasItem;
+    destroy(): void;
+    update(): ICanvasItem;
+    select(): ICanvasItem;
+
+    moveBy(delta: IPoint): ICanvasItem;
+
+    css(styles: TCSSStylesCollection): ICanvasItem;
+
+    showOverlay(options?: object): ICanvasItem;
+    hideOverlay(): ICanvasItem;
+
+    on(type: TEventType, handler: Function): ICanvasItem;
+    off(type: TEventType, handler?: Function): ICanvasItem;
+}
+
+
+interface ICanvasContainer {
     childIds: Iterable<TId> | null;
 
     insertChildBefore(id: TId, beforeId: TId): ICanvasContainer;
@@ -85,32 +122,16 @@ interface ICanvasContainer extends ICanvasItem {
 }
 
 
-interface ICanvasItem {
-    id: TId;
+interface ICanvasChild {
     parentId: TId | null;
-
-    element: SVGElement;
-
-    destroy(): void;
-
-    moveBy(delta: IPoint): ICanvasItem;
 
     insertIntoContainer(id: TId): ICanvasItem;
     extractFromContainer(): ICanvasItem;
 
-    // lift(): ICanvasItem;
     moveForwards(steps?: number): ICanvasItem;
     moveBackwards(steps?: number): ICanvasItem;
     moveToTheFront(): ICanvasItem;
     moveToTheBack(): ICanvasItem;
-
-    style(styles: TCSSStylesCollection): ICanvasItem;
-
-    showOverlay(options?: object): ICanvasItem;
-    hideOverlay(): ICanvasItem;
-
-    on(type: TEventType, handler: Function): ICanvasItem;
-    off(type: TEventType, handler?: Function): ICanvasItem;
 }
 
 

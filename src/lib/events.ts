@@ -83,3 +83,35 @@ export class EventReceiver implements IEventListener {
         this.handlers.delete(type);
     }
 }
+
+
+export class EventTargetMixin implements IEventTargetMixin {
+    protected eventHandlers: Map<string, Set<Function>> = new Map();
+
+    public getHandlers(type: TEventType): Set<Function> | null {
+        return this.eventHandlers.get(type) || null;
+    }
+
+    public async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
+        const handlers = this.eventHandlers.get(type);
+        handlers?.forEach(handler => handler({ type, detail }));
+    }
+
+    public on(type: string, handler: Function): void {
+        const handlers = this.eventHandlers.get(type);
+        if (handlers) {
+            handlers.add(handler);
+        } else {
+            this.eventHandlers.set(type, new Set([ handler ]));
+        }
+    }
+
+    public off(type: string, handler?: Function): void {
+        if (handler) {
+            const handlers = this.eventHandlers.get(type);
+            handlers.delete(handler);
+        } else {
+            this.eventHandlers.delete(type);
+        }
+    }
+}

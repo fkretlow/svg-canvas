@@ -1,7 +1,8 @@
 import { getNextElementInArray, getPreviousElementInArray } from "./../util";
+import { EventTargetMixin } from "./../events";
 
 
-export abstract class CanvasItem implements ICanvasItem {
+export abstract class CanvasItem implements ICanvasItem, IEventTarget {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         this.getItem = getItem;
         this.truth = truth;
@@ -11,35 +12,35 @@ export abstract class CanvasItem implements ICanvasItem {
     protected readonly truth: ICanvasSourceItem;
 
     protected getItem: TCanvasItemGetter;
-    protected eventHandlers: Map<string, Set<Function>> = new Map();
 
+    /*
+     * Internal Event Handling
+     */
+    protected eventTargetMixin = new EventTargetMixin();
     protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
-        const handlers = this.eventHandlers.get(type);
-        handlers?.forEach(handler => handler({ type, detail }));
+        return this.eventTargetMixin.emitEvent(type, detail);
     }
-
     public on(type: string, handler: TMouseEventHandler): CanvasItem {
-        const handlers = this.eventHandlers.get(type);
-        if (handlers) {
-            handlers.add(handler);
-        } else {
-            this.eventHandlers.set(type, new Set([ handler ]));
-        }
+        this.eventTargetMixin.on(type, handler);
+        return this;
+    }
+    public off(type: string, handler?: Function): CanvasItem {
+        this.eventTargetMixin.off(type, handler);
         return this;
     }
 
-    public off(type: string, handler?: Function): CanvasItem {
-        if (handler) {
-            const handlers = this.eventHandlers.get(type);
-            handlers.delete(handler);
-        } else {
-            this.eventHandlers.delete(type);
-        }
+    public mount(parent: HTMLElement): CanvasItem {
+        parent.appendChild(this.element);
+        return this;
+    }
+    public unmount(): CanvasItem {
+        this.element.parentElement?.removeChild(this.element);
         return this;
     }
 
     public abstract destroy(): void;
     public abstract update(): CanvasItem;
+    public abstract select(): CanvasItem;
     public abstract moveBy(delta: IPoint): CanvasItem;
 
     public abstract showOverlay(options?: object): CanvasItem;
@@ -57,14 +58,14 @@ export abstract class CanvasItem implements ICanvasItem {
 
     protected getContainer(): ICanvasContainer | null {
         if (!this.parentId) return null;
-        const container = this.getItem(this.parentId) as ICanvasContainer;
+        const container = this.getItem(this.parentId) as (ICanvasItem & ICanvasContainer);
         if (container === null || !container.hasOwnProperty("childIds"))
             throw new Error(`can't get a container`);
         return container;
     }
 
     insertIntoContainer(containerId: TId, beforeId?: TId | null): CanvasItem {
-        const container = this.getItem(containerId) as ICanvasContainer;
+        const container = this.getItem(containerId) as (ICanvasItem & ICanvasContainer);
         if (container === null || !container.hasOwnProperty("insertChild")) {
             throw new Error(`CanvasItem.insertIntoContainer: ${container} is not a container`);
         }
@@ -133,12 +134,7 @@ export abstract class CanvasItem implements ICanvasItem {
         return this;
     }
 
-    style(styles: TCSSStylesCollection): CanvasItem {
-        for (let [ prop, val ] of Object.entries(styles)) {
-            this.element.style.setProperty(prop, val);
-        }
-        return this;
-    }
+    abstract css(styles: TCSSStylesCollection): CanvasItem;
 }
 
 

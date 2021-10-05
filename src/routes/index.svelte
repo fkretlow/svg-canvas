@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { SVGCanvas } from "$lib/SVGCanvas";
+    import { Canvas } from "$lib/canvas/Canvas";
     import { EventBus, EventReceiver } from "$lib/events";
     import { Model } from "$lib/model";
     import { wait, makeRandomRectangle } from "$lib/util";
@@ -8,7 +8,7 @@
     let bus: EventBus;
     let receiver: EventReceiver;
     let model: Model;
-    let canvas: SVGCanvas;
+    let canvas: Canvas;
 
 
     let main: HTMLElement;
@@ -18,7 +18,7 @@
         model = new Model();
         bus.registerSource(model);
 
-        canvas = new SVGCanvas(main, {
+        canvas = new Canvas(main, {
             styles: {
                 width: "100%",
                 height: "100%",
