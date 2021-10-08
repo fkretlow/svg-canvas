@@ -37,10 +37,20 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
+    /**
+     * Apply CSS styles to the svg element. Override this method in subclasses if needed.
+     */
+    public css(styles: TCSSStylesCollection): CanvasItem {
+        for (let [ property, value ] of Object.entries(styles)) {
+            this.element.style.setProperty(property, value);
+        }
+        return this;
+    }
+
     public abstract destroy(): void;
     public abstract update(): CanvasItem;
     public abstract select(): CanvasItem;
-    abstract css(styles: TCSSStylesCollection): CanvasItem;
+    public abstract deselect(): CanvasItem;
 
     public abstract showOverlay(options?: object): CanvasItem;
     public abstract hideOverlay(): CanvasItem;

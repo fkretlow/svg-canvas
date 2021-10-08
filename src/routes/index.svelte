@@ -22,6 +22,8 @@
             styles: {
                 width: "100%",
                 height: "100%",
+                "background-color": "#edc",
+                "border": "1px solid rgba(0,0,0,.2)",
             }
         });
 
@@ -32,13 +34,12 @@
             model.move(id, position);
         });
 
-        canvas.on("click", (event: IEvent) => {
-            const { id, altKey } = event.detail;
-            if (altKey) {
-                model.delete(id);
-            } else {
-                model.changeColor(id);
-            }
+        canvas.on("delete", (event: IEvent) => {
+            model.delete(event.detail!.id);
+        });
+
+        canvas.on("select", (event: IEvent) => {
+            console.log("selected item", event.detail!.id);
         });
 
         receiver = new EventReceiver();

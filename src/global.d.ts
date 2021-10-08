@@ -61,7 +61,7 @@ interface ICanvas {
     mount(parent: Element): ICanvas;
     unmount(): ICanvas;
     update(ids: Iterable<TId>): ICanvas;
-    deleteItems(ids: Iterable<TId>): ICanvas;
+    delete(ids: Iterable<TId>): ICanvas;
     select(ids: Iterable<TId>): ICanvas;
     setOptions(options: Partial<ICanvasOptions>): ICanvas;
 }
@@ -81,7 +81,7 @@ interface ICanvasSourceItem {
 
 
 interface ICanvasOptions {
-    styles: TCSSStylesCollection;
+    styles?: TCSSStylesCollection;
 }
 
 
@@ -95,6 +95,7 @@ interface ICanvasItem {
     destroy(): void;
     update(): ICanvasItem;
     select(): ICanvasItem;
+    deselect(): ICanvasItem;
 
     css(styles: TCSSStylesCollection): ICanvasItem;
 
