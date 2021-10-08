@@ -1,17 +1,24 @@
 import { createSVGElement } from "./../util";
 import { EventTargetMixin } from "./../events";
 import { CanvasSnippet } from "./CanvasSnippet";
+import { CanvasContainer } from "./CanvasItem";
+import { v4 as uuid } from "uuid";
 
 
 export class Canvas implements ICanvas {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
+        this.root = new CanvasRoot(id => this.getItem(id));
+        this.registerItem(this.root);
+        console.log(`Canvas.constructor, root should be in here:`);
+        this.items.forEach(item => {
+            console.log(item.constructor.name);
+        })
         if (options) this.setOptions(options);
-        this.svg = this.createSvgElement();
         if (parent) this.mount(parent);
     }
 
     private truth: Iterable<ICanvasSourceItem> | null = null;
-    private readonly svg: SVGElement;
+    private readonly root: CanvasRoot;
 
     private readonly options: ICanvasOptions = {
         styles: {
@@ -42,21 +49,11 @@ export class Canvas implements ICanvas {
      * Item registry
      */
     private readonly items = new Map<TId, ICanvasItem>();
-    private getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
+    private getItem(id: TId): ICanvasItem | null {
+        return this.items.get(id) || null;
+    }
     private registerItem(item: ICanvasItem): void { this.items.set(item.id, item); }
     private unregisterItem(id: TId): boolean { return this.items.delete(id); }
-
-    private createSvgElement(): SVGElement {
-        const svg = createSVGElement("svg") as SVGElement;
-        this.applyStyles(svg);
-        return svg;
-    }
-
-    private applyStyles(svg: SVGElement): void {
-        for (let [ property, value ] of Object.entries(this.options.styles)) {
-            svg.style.setProperty(property, value);
-        }
-    }
 
     public setTruth(data: Iterable<ICanvasSourceItem>): Canvas {
         this.truth = data;
@@ -71,12 +68,13 @@ export class Canvas implements ICanvas {
 
     public update(): Canvas {
         const truth = this.processTruth();
+        console.log("Canvas.update: found", truth.size, "truth items");
 
         // remove deleted, update remaining
         for (let item of this.items.values()) {
-            if (!truth.has(item.id))    this.delete(item.id);
-
-            else {
+            if (!truth.has(item.id) && !Object.is(item, this.root)) {
+                this.deleteItems([ item.id ]);
+            } else {
                 item.update();
                 truth.delete(item.id);
             }
@@ -91,55 +89,59 @@ export class Canvas implements ICanvas {
     }
 
     public add(source: ICanvasSourceItem): Canvas {
-        const item = new CanvasSnippet(this.getItem, source);
+        const item = new CanvasSnippet(id => this.getItem(id), source);
         this.registerItem(item);
+        this.setupItemEventHandlers(item);
 
-        const container = this.getItem(item.parentId) as (ICanvasItem & ICanvasContainer);
+        const container = (this.getItem(item.parentId) || this.root) as ICanvasContainer;
         if (container) container.appendChild(item.id);
-        else {
-            item.mount(this.svg);
-        }
 
         return this;
     }
 
-    public delete(ids: Iterable<TId>): Canvas {
+    public deleteItems(ids: Iterable<TId>): Canvas {
         for (let id of ids) {
             const item = this.getItem(id);
-            if (item.parentId) (<ICanvasChild>(<unknown>item)).extractFromContainer();
+            console.log("Canvas.deleteItems: item", item);
             item.destroy();
             this.unregisterItem(id);
         }
         return this;
     }
 
-    public select(id: TId): Canvas { return this; }
-
-    public setOptions(options: Partial<ICanvasOptions>): Canvas {
-        Object.assign(this.options.styles, options.styles);
-        if (this.svg) this.applyStyles(this.svg);
+    public select(id: TId): Canvas {
+        const item = this.getItem(id);
+        if (!item)
+            throw new Error(`Canvas.select: item not found`);
+        item.select();
         return this;
     }
 
-    public mount(parent: HTMLElement): Canvas {
-        parent.appendChild(this.svg);
+    public setOptions(options: Partial<ICanvasOptions>): Canvas {
+        Object.assign(this.options.styles, options.styles);
+        if (this.root && options.styles !== undefined) this.root.css(options.styles);
+        return this;
+    }
+
+    public mount(parent: Element): Canvas {
+        this.root.mount(parent);
         return this;
     }
 
     public unmount(): Canvas {
-        this.svg.parentElement?.removeChild(this.svg);
+        this.root.unmount();
         return this;
     }
 
     private setupItemEventHandlers(item: ICanvasItem & ICanvasRectangle): void {
-        item.on("mousedown", (e: MouseEvent) => {
+        item.on("mousedown", () => {
             this.emitEvent("grab", { id: item.id });
             const _onmousemove = (e: MouseEvent) => {
                 const delta = { x: e.movementX, y: e.movementY };
                 item.moveBy(delta);
                 this.emitEvent("drag", { id: item.id, delta })
             };
-            const _onmouseup = (e: MouseEvent) => {
+            const _onmouseup = () => {
                 window.removeEventListener("mousemove", _onmousemove, true);
                 window.removeEventListener("mouseup", _onmouseup, true);
                 this.emitEvent("drop", { id: item.id, position: { x: item.x, y: item.y }});
@@ -155,5 +157,45 @@ export class Canvas implements ICanvas {
                 ctrlKey: e.ctrlKey,
             });
         });
+    }
+}
+
+
+class CanvasRoot extends CanvasContainer {
+    constructor(getItem: TCanvasItemGetter) {
+        super(getItem);
+        this.element = this.createSVGElement();
+    }
+
+    readonly id: TId = uuid();
+    readonly element: SVGElement;
+    protected readonly getItem: TCanvasItemGetter;
+
+    destroy() {}
+    update() { return this; }
+    select() { return this; }
+    showOverlay() { return this; }
+    hideOverlay() { return this; }
+
+    mount(parent: Element): CanvasRoot {
+        parent.appendChild(this.element);
+        return this;
+    }
+
+    unmount(): CanvasRoot {
+        this.element.parentElement?.removeChild(this.element);
+        return this;
+    }
+
+    private createSVGElement(): SVGElement {
+        const element = createSVGElement("svg") as SVGElement;
+        return element;
+    }
+
+    public css(styles: TCSSStylesCollection): CanvasRoot {
+        for (let [ property, value ] of Object.entries(styles)) {
+            this.element.style.setProperty(property, value);
+        }
+        return this;
     }
 }

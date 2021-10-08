@@ -3,13 +3,12 @@ import { EventTargetMixin } from "./../events";
 
 
 export abstract class CanvasItem implements ICanvasItem, IEventTarget {
-    constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
+    constructor(getItem: TCanvasItemGetter) {
         this.getItem = getItem;
-        this.truth = truth;
     }
 
+    abstract readonly id: TId;
     abstract readonly element: SVGElement;
-    protected readonly truth: ICanvasSourceItem;
 
     protected getItem: TCanvasItemGetter;
 
@@ -29,7 +28,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
-    public mount(parent: HTMLElement): CanvasItem {
+    public mount(parent: Element): CanvasItem {
         parent.appendChild(this.element);
         return this;
     }
@@ -41,12 +40,97 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
     public abstract destroy(): void;
     public abstract update(): CanvasItem;
     public abstract select(): CanvasItem;
-    public abstract moveBy(delta: IPoint): CanvasItem;
+    abstract css(styles: TCSSStylesCollection): CanvasItem;
 
     public abstract showOverlay(options?: object): CanvasItem;
     public abstract hideOverlay(): CanvasItem;
+}
 
-    public get id(): TId { return this.truth.id; }
+
+export abstract class CanvasContainer extends CanvasItem implements ICanvasContainer, IEventTarget {
+    constructor(getItem: TCanvasItemGetter) {
+        super(getItem);
+    }
+
+    readonly childIds: TId[] = [];
+    getChildren(): ICanvasItem[] {
+        return this.childIds.map((id: TId) => this.getItem(id));
+    }
+
+    insertChildBefore(id: TId, beforeId: TId): ICanvasContainer {
+        const child = this.getItem(id) as ICanvasChild;
+        if (child === null)
+            throw new Error(`CanvasContainerMixin.insertChildBefore: there's no element with this id`);
+
+        const next = this.getItem(beforeId) as ICanvasChild;
+        if (next === null)
+            throw new Error(`CanvasContainerMixin.insertChildBefore: there's no element with this id`);
+
+        let i = this.childIds.findIndex((id: TId) => id === beforeId);
+        if (i === -1)
+            throw new Error(`CanvasContainerMixin.insertChild: beforeId not found`);
+
+        this.childIds.splice(i, 0, id);
+        this.element.insertBefore(child.element, next.element);
+        child.parentId = this.id;
+
+        return this;
+    }
+
+    extractChild(id: TId): ICanvasContainer {
+        const child = this.getItem(id) as ICanvasChild;
+        if (child === null)
+            throw new Error(`CanvasContainerMixin.insertChildBefore: there's no element with this id`);
+
+        let i = this.childIds.findIndex((childId: TId) => childId === id);
+        if (i === -1)
+            throw new Error(`CanvasContainerMixin.insertChild: beforeId not found`);
+
+        this.element.removeChild(child.element);
+        this.childIds.splice(i, 1);
+        child.parentId = null;
+
+        return this;
+    }
+
+    appendChild(id: TId): ICanvasContainer {
+        const child = this.getItem(id) as ICanvasChild;
+        if (child === null)
+            throw new Error(`CanvasContainerMixin.insertChildBefore: there's no element with this id`);
+
+        this.childIds.push(id);
+        this.element.appendChild(child.element);
+        child.parentId = this.id;
+
+        return this;
+    }
+
+    prependChild(id: TId): ICanvasContainer {
+        const nextId = this.childIds[0];
+        if (nextId) return this.insertChildBefore(id, nextId);
+        else        return this.appendChild(id);
+    }
+
+    getNextChild(id: TId): TId | null {
+        const i = this.childIds.findIndex((childId: TId) => childId === id);
+        if (i === -1)
+            throw new Error(`CanvasContainerMixin.getNextChild: cannot find the given id`);
+        return getNextElementInArray(this.childIds, i);
+    }
+
+    getPreviousChild(id: TId): TId | null {
+        const i = this.childIds.findIndex((childId: TId) => childId === id);
+        if (i === -1)
+            throw new Error(`CanvasContainerMixin.getNextChild: cannot find the given id`);
+        return getPreviousElementInArray(this.childIds, i);
+    }
+}
+
+
+export abstract class CanvasChild extends CanvasItem implements ICanvasChild, IEventTarget {
+    constructor(getItem: TCanvasItemGetter) {
+        super(getItem);
+    }
 
     protected _parentId: TId | null;
     public get parentId(): TId | null {
@@ -58,14 +142,16 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
 
     protected getContainer(): ICanvasContainer | null {
         if (!this.parentId) return null;
-        const container = this.getItem(this.parentId) as (ICanvasItem & ICanvasContainer);
-        if (container === null || !container.hasOwnProperty("childIds"))
+        const container = this.getItem(this.parentId) as ICanvasContainer;
+        if (container === null)
             throw new Error(`can't get a container`);
+        if (!container.hasOwnProperty("childIds"))
+            throw new Error(`container has no property 'childIds'`);
         return container;
     }
 
     insertIntoContainer(containerId: TId, beforeId?: TId | null): CanvasItem {
-        const container = this.getItem(containerId) as (ICanvasItem & ICanvasContainer);
+        const container = this.getItem(containerId) as ICanvasContainer;
         if (container === null || !container.hasOwnProperty("insertChild")) {
             throw new Error(`CanvasItem.insertIntoContainer: ${container} is not a container`);
         }
@@ -132,89 +218,5 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         container.prependChild(this.id);
 
         return this;
-    }
-
-    abstract css(styles: TCSSStylesCollection): CanvasItem;
-}
-
-
-export abstract class CanvasContainer extends CanvasItem implements ICanvasContainer {
-    constructor(getItem: TCanvasItemGetter, source: any) {
-        super(getItem, source);
-    }
-
-    protected _childIds: TId[] = [];
-    public get childIds(): TId[] { return this._childIds; }
-
-    protected getChildren(): ICanvasItem[] {
-        return this.childIds.map(id => this.getItem(id));
-    }
-
-    insertChildBefore(id: TId, beforeId: TId): CanvasContainer {
-        const child = this.getItem(id) as ICanvasItem;
-        if (child === null)
-            throw new Error(`CanvasContainer.insertChildBefore: there's no element with this id`);
-
-        const next = this.getItem(beforeId) as ICanvasItem;
-        if (next === null)
-            throw new Error(`CanvasContainer.insertChildBefore: there's no element with this id`);
-
-        let i = this.childIds.findIndex(id => id === beforeId);
-        if (i === -1)
-            throw new Error(`CanvasContainer.insertChild: beforeId not found`);
-
-        this.childIds.splice(i, 0, id);
-        this.element.insertBefore(child.element, next.element);
-        child.parentId = this.id;
-
-        return this;
-    }
-
-    extractChild(id: TId): CanvasContainer {
-        const child = this.getItem(id) as ICanvasItem;
-        if (child === null)
-            throw new Error(`CanvasContainer.insertChildBefore: there's no element with this id`);
-
-        let i = this.childIds.findIndex(childId => childId === id);
-        if (i === -1)
-            throw new Error(`CanvasContainer.insertChild: beforeId not found`);
-
-        this.element.removeChild(child.element);
-        this.childIds.splice(i, 1);
-        child.parentId = null;
-
-        return this;
-    }
-
-    appendChild(id: TId): CanvasContainer {
-        const child = this.getItem(id) as ICanvasItem;
-        if (child === null)
-            throw new Error(`CanvasContainer.insertChildBefore: there's no element with this id`);
-
-        this.childIds.push(id);
-        this.element.appendChild(child.element);
-        child.parentId = this.id;
-
-        return this;
-    }
-
-    prependChild(id: TId): CanvasContainer {
-        const nextId = this.childIds[0];
-        if (nextId) return this.insertChildBefore(id, nextId);
-        else        return this.appendChild(id);
-    }
-
-    getNextChild(id: TId): TId | null {
-        const i = this.childIds.findIndex(childId => childId === id);
-        if (i === -1)
-            throw new Error(`CanvasContainer.getNextChild: cannot find the given id`);
-        return getNextElementInArray(this.childIds, i);
-    }
-
-    getPreviousChild(id: TId): TId | null {
-        const i = this.childIds.findIndex(childId => childId === id);
-        if (i === -1)
-            throw new Error(`CanvasContainer.getNextChild: cannot find the given id`);
-        return getPreviousElementInArray(this.childIds, i);
     }
 }

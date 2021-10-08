@@ -47,7 +47,7 @@ export function makeRandomRectangle(): IRectangle {
  * @param A             The array.
  * @param i             At what index to start the search. `-1` to include the first, `A.length` to
  *                      include the last element.
- * @param predicate     The predicate the the returned element must satisfy.
+ * @param predicate     The predicate (if any) that the returned element must satisfy.
  * @return              The nearest element that satisfies the predicate or null.
  */
 
@@ -76,5 +76,19 @@ export function getPreviousElementInArray<T>(
             if (predicate(A[i])) return A[i];
         }
         return null;
+    }
+}
+
+
+export function applyMixin(target: object, mixin: IMixin): void {
+    if (mixin.instanceAttributes) {
+        for (let [ name, create ] of Object.entries(mixin.instanceAttributes)) {
+            Object.defineProperty(target, name, create());
+        }
+    }
+    if (mixin.methods) {
+        for (let [ name, method ] of Object.entries(mixin.methods)) {
+            Object.defineProperty(target.constructor.prototype, name, { value: method });
+        }
     }
 }

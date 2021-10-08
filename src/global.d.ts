@@ -58,10 +58,10 @@ type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
 
 interface ICanvas {
     setTruth(data: Iterable<ICanvasSourceItem>): ICanvas;
-    mount(parent: HTMLElement): ICanvas;
+    mount(parent: Element): ICanvas;
     unmount(): ICanvas;
     update(ids: Iterable<TId>): ICanvas;
-    delete(ids: Iterable<TId>): ICanvas;
+    deleteItems(ids: Iterable<TId>): ICanvas;
     select(ids: Iterable<TId>): ICanvas;
     setOptions(options: Partial<ICanvasOptions>): ICanvas;
 }
@@ -87,17 +87,14 @@ interface ICanvasOptions {
 
 interface ICanvasItem {
     readonly id: TId;
-    parentId: TId | null;
 
     readonly element: SVGElement;
 
-    mount(parent: SVGElement): ICanvasItem;
+    mount(parent: Element): ICanvasItem;
     unmount(): ICanvasItem;
     destroy(): void;
     update(): ICanvasItem;
     select(): ICanvasItem;
-
-    moveBy(delta: IPoint): ICanvasItem;
 
     css(styles: TCSSStylesCollection): ICanvasItem;
 
@@ -109,8 +106,9 @@ interface ICanvasItem {
 }
 
 
-interface ICanvasContainer {
-    childIds: Iterable<TId> | null;
+interface ICanvasContainer extends ICanvasItem {
+    readonly childIds: Iterable<TId> | null;
+    getChildren(): Iterable<ICanvasItem>;
 
     insertChildBefore(id: TId, beforeId: TId): ICanvasContainer;
     extractChild(id: TId): ICanvasContainer;
@@ -122,7 +120,7 @@ interface ICanvasContainer {
 }
 
 
-interface ICanvasChild {
+interface ICanvasChild extends ICanvasItem {
     parentId: TId | null;
 
     insertIntoContainer(id: TId): ICanvasItem;
@@ -136,16 +134,18 @@ interface ICanvasChild {
 
 
 interface ICanvasRectangle extends ICanvasItem, IRectangle {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
     resize(size: ISize): ICanvasRectangle;
     moveTo(pos: IPoint): ICanvasRectangle;
+    moveBy(delta: IPoint): ICanvasItem;
 }
 
 
 interface INamedCanvasItem extends ICanvasItem {
     name: string;
     rename(name: string): INamedCanvasItem;
+}
+
+interface IMixin {
+    instanceAttributes: { [ k: string ]: () => PropertyDescriptor };
+    methods: { [k: string]: PropertyDescriptor };
 }

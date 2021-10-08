@@ -1,18 +1,22 @@
-import { CanvasItem } from "./CanvasItem";
+import { CanvasChild } from "./CanvasItem";
 import { createSVGElement } from "./../util";
 
 
 export class CanvasSnippet
-extends CanvasItem
-implements ICanvasRectangle, INamedCanvasItem {
+extends CanvasChild
+implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
-        super(getItem, truth);
+        super(getItem);
+        this.truth = truth;
         this._rectElement = this.createRectElement();
         this._nameElement = this.createNameElement();
         this._rectElement.appendChild(this._nameElement);
         this.setupEventListeners();
         this.update();
     }
+
+    private readonly truth: ICanvasSourceItem;
+    get id(): TId { return this.truth.id; }
 
     private createRectElement(): SVGRectElement {
         return createSVGElement("rect") as SVGRectElement;
