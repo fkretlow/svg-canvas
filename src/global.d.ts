@@ -20,6 +20,10 @@ interface IRectangle extends IPoint, ISize {
 }
 
 
+type TStateKey = string;
+type TStateTransition = (event: IEvent) => TStateKey;
+
+
 type TEventType = string;
 type TEventDetail = any;
 interface IEvent {
@@ -54,7 +58,6 @@ interface IEventTargetMixin extends IEventTarget {
 }
 
 type TMouseEventHandler = ((e: MouseEvent) => any);
-type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
 
 interface ICanvas {
     setTruth(data: Iterable<ICanvasSourceItem>): ICanvas;
