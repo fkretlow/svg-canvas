@@ -30,8 +30,9 @@
         canvas.setTruth(model.rectangles);
 
         canvas.on("drop", (event: IEvent) => {
-            const { id, position } = event.detail;
-            model.move(id, position);
+            event.detail.items.forEach(({ id, position }) => {
+                model.move(id, position);
+            })
         });
 
         canvas.on("delete", (event: IEvent) => {
@@ -41,6 +42,10 @@
         canvas.on("select", (event: IEvent) => {
             console.log("selected item", event.detail!.id);
         });
+
+        canvas.on("deselect", (event: IEvent) => {
+            console.log("deselected item", event.detail!.id);
+        })
 
         receiver = new EventReceiver();
         bus.registerListener(receiver);

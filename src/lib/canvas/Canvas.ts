@@ -1,23 +1,10 @@
 import { EventTargetMixin } from "./../events";
-import { StateMachine, IState } from "./StateMachine";
 import { CanvasSnippet } from "./CanvasSnippet";
 import { CanvasRoot } from "./CanvasRoot";
 
 
-type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
-
-type TCanvasStateKey =
-    "lasso-select" |
-    "drag-item" |
-    "rename-item" |
-    "resize-item" |
-    "init";
-
-
-export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
+export class Canvas implements ICanvas {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
-        super();
-        this.initializeStateMachine();
         this.root = new CanvasRoot((id: TId) => this.getItem(id));
         this.setupRootEventHandlers(this.root);
         this.registerItem(this.root);
@@ -33,7 +20,7 @@ export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
      * Event Handling
      */
     protected eventTargetMixin = new EventTargetMixin();
-    protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
+    public async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
         this.eventTargetMixin.emitEvent(type, detail);
     }
     public on(type: string, handler: TMouseEventHandler): Canvas {
@@ -49,7 +36,7 @@ export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
      * Item registry
      */
     private readonly items = new Map<TId, ICanvasItem>();
-    private getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
+    public getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
     private registerItem(item: ICanvasItem): void { this.items.set(item.id, item); }
     private unregisterItem(id: TId): boolean { return this.items.delete(id); }
 
@@ -61,7 +48,7 @@ export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
     public select(id: TId, multiple: boolean = false): Canvas {
         const item = this.getItem(id);
         if (!item) throw new Error(`Canvas.select: item not found`);
-        if (!multiple) this.selection.clear();
+        if (!multiple) this.clearSelection();
         this.selection.add(id);
         item.select();
         this.emitEvent("select", { id });
@@ -158,38 +145,7 @@ export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
 
     private setupItemEventHandlers(item: CanvasSnippet): void {
         item.on("mousedown", (e: MouseEvent) => {
-            let hasMoved = false;
-
-            const _onmousemove = (e: MouseEvent) => {
-                if (!hasMoved) {
-                    hasMoved = true;
-                    this.emitEvent("grab", { id: item.id });
-                    item.moveToTheFront();
-                }
-
-                const delta = { x: e.movementX, y: e.movementY };
-                item.moveBy(delta);
-                this.emitEvent("drag", { id: item.id, delta });
-            };
-
-            const _onmouseup = (e: MouseEvent) => {
-                e.stopPropagation();
-
-                window.removeEventListener("mousemove", _onmousemove, true);
-                window.removeEventListener("mouseup", _onmouseup, true);
-
-                if (hasMoved) {
-                    this.emitEvent("drop", { id: item.id, position: { x: item.x, y: item.y }});
-                }
-
-                else {
-                    if (e.altKey)   this.delete(item.id);
-                    else            this.select(item.id, e.shiftKey);
-                }
-            };
-
-            window.addEventListener("mousemove", _onmousemove, true);
-            window.addEventListener("mouseup", _onmouseup, true);
+            this.transition("mousedown", { targetId: item.id, domEvent: e });
         });
     }
 
@@ -197,70 +153,108 @@ export class Canvas extends StateMachine<TCanvasStateKey> implements ICanvas {
         root.on("mouseup", () => this.clearSelection());
     }
 
+
     /*
      * State machine
      */
-    private initializeStateMachine(): void {
-        this.registerState({
-            key: "init",
-            transition: (event: IEvent): TCanvasStateKey => {
-                switch (event.type) {
-                    case "item:mousedown":
-                        return "drag-item";
-                    default:
-                        return "init";
-                }
-            },
-        });
+    private state: CanvasState = new ReadyState(this);
+    public transition(type: TEventType, detail?: TEventDetail): void {
+        this.state = this.state.execute(type, detail);
+    }
+}
 
-        this.registerState({
-            key: "drag-item",
 
-            transition: (event: IEvent): TCanvasStateKey => {
-                switch (event.type) {
-                    case "mousemove":
-                        return "drag-item";
-                    case "mouseup":
-                        return "init";
-                    default:
-                        return "drag-item";
-                }
-            },
+abstract class CanvasState {
+    constructor(protected canvas: Canvas) {}
+    abstract execute(type: TEventType, detail?: TEventDetail): CanvasState;
 
-            initialize: (event: IEvent): void => {
-                const items = [...this.selection].map(id => this.getItem(id)) as any[];
-                let hasMoved = false;
+    protected eventListeners: IEventHandlerRecord[] = [];
+    protected attachEventListenerTo(target: EventTarget, type: string, handler: any, capture: boolean) {
+        this.eventListeners.push({ target, type, handler, capture });
+        target.addEventListener(type, handler, capture);
+    }
+    protected clearEventListeners(): void {
+        while (this.eventListeners.length > 0) {
+            const { target, type, handler, capture }: IEventHandlerRecord = this.eventListeners.pop();
+            target.removeEventListener(type, handler, capture);
+        }
+    }
+}
 
-                const _onmousemove = (e: MouseEvent) => {
-                    if (!hasMoved) {
-                        hasMoved = true;
-                        items.forEach(item => item.moveToTheFront());
-                    }
 
-                    const delta = { x: e.movementX, y: e.movementY };
-                    items.forEach(item => item.moveBy(delta));
+class ReadyState extends CanvasState {
+    execute(type: TEventType, detail?: TEventDetail): CanvasState {
+        switch (type) {
+            case "mousedown":
+                return this.handleMousedown(detail);
+            default:
+                return this;
+        }
+    }
+
+    private handleMousedown({ targetId, domEvent }: any): CanvasState {
+        if (!this.canvas.selection.has(targetId)) {
+            this.canvas.select(targetId, domEvent.shiftKey);
+        }
+        return new DragState(this.canvas);
+    }
+}
+
+
+class DragState extends CanvasState {
+    constructor(canvas: Canvas) {
+        super(canvas);
+        this.setupEventListeners();
+    }
+
+    private hasMoved: boolean = false;
+
+    private setupEventListeners() {
+        const onmousemove = (e: MouseEvent) => {
+            const delta = { x: e.movementX, y: e.movementY };
+            this.canvas.transition("mousemove", { delta });
+        }
+        this.attachEventListenerTo(window, "mousemove", onmousemove, true);
+
+        const onmouseup = (e: MouseEvent) => {
+            e.stopPropagation();
+            this.canvas.transition("mouseup");
+        }
+        this.attachEventListenerTo(window, "mouseup", onmouseup, true);
+    }
+
+    execute(type: TEventType, detail?: TEventDetail): CanvasState {
+        switch (type) {
+            case "mousemove":
+                return this.handleMousemove(detail);
+            case "mouseup":
+                return this.handleMouseup();
+            default:
+                return this;
+        }
+    }
+
+    handleMousemove({ delta }: { delta: IPoint }): CanvasState {
+        const items = [...this.canvas.selection].map(id => this.canvas.getItem(id));
+        if (!this.hasMoved) {
+            this.hasMoved = true;
+            items.forEach((item: any) => item.moveToTheFront?.());
+        }
+        items.forEach((item: any) => item.moveBy?.(delta));
+        return this;
+    }
+
+    handleMouseup(): CanvasState {
+        const items = [...this.canvas.selection].map(id => this.canvas.getItem(id));
+        this.canvas.emitEvent("drop", {
+            items: items.map((item: any) => {
+                return {
+                    id: item.id,
+                    position: { x: item.x, y: item.y }
                 };
-
-                const _onmouseup = (e: MouseEvent) => {
-                    e.stopPropagation();
-
-                    window.removeEventListener("mousemove", _onmousemove, true);
-                    window.removeEventListener("mouseup", _onmouseup, true);
-
-                    if (hasMoved) {
-                        this.emitEvent("drop", {
-                            data: items.map(item => {
-                                return {
-                                    id: item.id,
-                                    position: { x: item.x, y: item.y },
-                                };
-                            }),
-                        });
-                    }
-                };
-            },
+            }),
         });
-
-        this.setState("init");
+        this.clearEventListeners();
+        return new ReadyState(this.canvas);
     }
 }

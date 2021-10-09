@@ -59,6 +59,16 @@ interface IEventTargetMixin extends IEventTarget {
 
 type TMouseEventHandler = ((e: MouseEvent) => any);
 
+interface IEventHandlerRecord {
+    target: EventTarget;
+    type: string;
+    handler: any;
+    capture: boolean;
+}
+
+
+type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
+
 interface ICanvas {
     setTruth(data: Iterable<ICanvasSourceItem>): ICanvas;
     mount(parent: Element): ICanvas;
