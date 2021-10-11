@@ -16,6 +16,7 @@ interface ISize {
 }
 
 interface IRectangle extends IPoint, ISize {
+    name: string;
     color: string;
 }
 
@@ -74,7 +75,7 @@ interface ICanvas {
     mount(parent: Element): ICanvas;
     unmount(): ICanvas;
     update(ids: Iterable<TId>): ICanvas;
-    delete(ids: Iterable<TId>): ICanvas;
+    deleteItem(ids: Iterable<TId>): ICanvas;
     select(ids: Iterable<TId>): ICanvas;
     setOptions(options: Partial<ICanvasOptions>): ICanvas;
 }

@@ -63,9 +63,10 @@ export class Rectangle {
     }
 
     id = uuid();
-    color = chroma.random().hex();
+    name: string = "unnamed";
     x: number;
     y: number;
     width: number;
     height: number;
+    color = chroma.random().hex();
 }

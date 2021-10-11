@@ -31,8 +31,11 @@ export function createSVGElement(
 }
 
 
+const _names = [ "apple", "banana", "pear", "ape", "table", "monitor", "formula", "love", "sea", "leaf" ];
+
 export function makeRandomRectangle(): IRectangle {
     return {
+        name: _names[randint(0, _names.length)],
         x: randint(20, 500), y: randint(20, 500),
         width: randint(20,100), height: randint(10,80),
         color: chroma.random().hex(),
@@ -76,19 +79,5 @@ export function getPreviousElementInArray<T>(
             if (predicate(A[i])) return A[i];
         }
         return null;
-    }
-}
-
-
-export function applyMixin(target: object, mixin: IMixin): void {
-    if (mixin.instanceAttributes) {
-        for (let [ name, create ] of Object.entries(mixin.instanceAttributes)) {
-            Object.defineProperty(target, name, create());
-        }
-    }
-    if (mixin.methods) {
-        for (let [ name, method ] of Object.entries(mixin.methods)) {
-            Object.defineProperty(target.constructor.prototype, name, { value: method });
-        }
     }
 }

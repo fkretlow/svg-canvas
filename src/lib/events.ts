@@ -115,3 +115,57 @@ export class EventTargetMixin implements IEventTargetMixin {
         }
     }
 }
+
+
+export class EventListenerRegistry {
+    private listeners = new Map<string, DynamicEventListener>();
+
+    public registerEventListener(key: string, listener: DynamicEventListener) {
+        this.listeners.set(key, listener);
+    }
+
+    public unregisterEventListener(key: string) {
+        this.listeners.delete(key);
+    }
+
+    public activate(key: string)    { this.listeners.get(key)?.activate(); }
+
+    public deactivate(key: string)  { this.listeners.get(key)?.deactivate(); }
+
+    public setEventMask(keys: Iterable<string>) {
+        if (!(keys instanceof Set)) keys = new Set(keys);
+        this.listeners.forEach((listener, key) => {
+            if ((<Set<string>>keys).has(key)) {
+                listener.activate();
+            } else {
+                listener.deactivate();
+            }
+        });
+    }
+}
+
+
+export class DynamicEventListener {
+    constructor(
+        readonly target: EventTarget,
+        readonly type: string,
+        readonly listener: EventListenerOrEventListenerObject,
+        readonly options?: EventListenerOptions,
+    ){}
+
+    private _isActive: boolean = false;
+    public get isActive(): boolean { return this._isActive; }
+    private set isActive(a: boolean) { this._isActive = a; }
+
+    public activate(): void {
+        if (this.isActive) return;
+        this.target.addEventListener(this.type, this.listener, this.options);
+        this.isActive = true;
+    }
+
+    public deactivate(): void {
+        if (!this.isActive) return;
+        this.target.removeEventListener(this.type, this.listener, this.options);
+        this.isActive = false;
+    }
+}

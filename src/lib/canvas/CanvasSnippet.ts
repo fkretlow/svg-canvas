@@ -25,7 +25,10 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
     }
 
     private createNameElement(): SVGTextElement {
-        return createSVGElement("text") as SVGTextElement;
+        const name = createSVGElement("text") as SVGTextElement;
+        name.style.setProperty("font", "12px sans-serif");
+        name.style.setProperty("fill", "black");
+        return name;
     }
 
     private setupEventListeners(): void {
