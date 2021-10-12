@@ -20,6 +20,14 @@ interface IRectangle extends IPoint, ISize {
     color: string;
 }
 
+interface IFontStyle {
+    "font-size"?: number | string;
+    "font-family"?: string;
+    "font-style"?: string;
+    "font-weight"?: number | string;
+    "font-variant"?: string;
+    "line-height": number;
+}
 
 type TStateKey = string;
 type TStateTransition = (event: IEvent) => TStateKey;

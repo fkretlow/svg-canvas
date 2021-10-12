@@ -34,10 +34,12 @@ export function createSVGElement(
 const _names = [ "apple", "banana", "pear", "ape", "table", "monitor", "formula", "love", "sea", "leaf" ];
 
 export function makeRandomRectangle(): IRectangle {
+    let name = "";
+    for (let i = 0; i < randint(2,5); ++i) name += _names[randint(0, _names.length)] + " ";
     return {
-        name: _names[randint(0, _names.length)],
+        name,
         x: randint(20, 500), y: randint(20, 500),
-        width: randint(20,100), height: randint(10,80),
+        width: 100, height: 40,
         color: chroma.random().hex(),
     };
 }
