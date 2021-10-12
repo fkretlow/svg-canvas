@@ -26,7 +26,7 @@ interface IFontStyle {
     "font-style"?: string;
     "font-weight"?: number | string;
     "font-variant"?: string;
-    "line-height": number;
+    "line-height"?: number;
 }
 
 type TStateKey = string;
@@ -113,63 +113,35 @@ interface ICanvasItem {
 
     readonly element: SVGElement;
 
+    parentId?: TId;
+    childIds?: Iterable<TId>;
+
     mount(parent: Element): ICanvasItem;
     unmount(): ICanvasItem;
     destroy(): void;
-    update(): ICanvasItem;
-    select(): ICanvasItem;
-    deselect(): ICanvasItem;
 
     css(styles: TCSSStylesCollection): ICanvasItem;
 
-    showOverlay(options?: object): ICanvasItem;
-    hideOverlay(): ICanvasItem;
+    update?(): ICanvasItem;
+
+    select?(): ICanvasItem;
+    deselect?(): ICanvasItem;
+
+
+    showOverlay?(options?: object): ICanvasItem;
+    hideOverlay?(): ICanvasItem;
 
     on(type: TEventType, handler: Function): ICanvasItem;
     off(type: TEventType, handler?: Function): ICanvasItem;
-}
 
+    moveTo?(pos: IPoint): ICanvasItem;
+    moveBy?(delta: IPoint): ICanvasItem;
 
-interface ICanvasContainer extends ICanvasItem {
-    readonly childIds: Iterable<TId> | null;
-    getChildren(): Iterable<ICanvasItem>;
+    resize?(size: ISize): ICanvasItem;
+    rename?(name: string): ICanvasItem;
 
-    insertChildBefore(id: TId, beforeId: TId): ICanvasContainer;
-    extractChild(id: TId): ICanvasContainer;
-    appendChild(id: TId): ICanvasContainer;
-    prependChild(id: TId): ICanvasContainer;
-
-    getNextChild(id: TId): TId | null;
-    getPreviousChild(id: TId): TId | null;
-}
-
-
-interface ICanvasChild extends ICanvasItem {
-    parentId: TId | null;
-
-    insertIntoContainer(id: TId): ICanvasItem;
-    extractFromContainer(): ICanvasItem;
-
-    moveForwards(steps?: number): ICanvasItem;
-    moveBackwards(steps?: number): ICanvasItem;
-    moveToTheFront(): ICanvasItem;
-    moveToTheBack(): ICanvasItem;
-}
-
-
-interface ICanvasRectangle extends ICanvasItem, IRectangle {
-    resize(size: ISize): ICanvasRectangle;
-    moveTo(pos: IPoint): ICanvasRectangle;
-    moveBy(delta: IPoint): ICanvasItem;
-}
-
-
-interface INamedCanvasItem extends ICanvasItem {
-    name: string;
-    rename(name: string): INamedCanvasItem;
-}
-
-interface IMixin {
-    instanceAttributes: { [ k: string ]: () => PropertyDescriptor };
-    methods: { [k: string]: PropertyDescriptor };
+    moveForwards?(): ICanvasItem;
+    moveBackwards?(): ICanvasItem;
+    moveToTheFront?(): ICanvasItem;
+    moveToTheBack?(): ICanvasItem;
 }

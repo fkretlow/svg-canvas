@@ -1,12 +1,10 @@
-import { CanvasChild } from "./CanvasItem";
+import { CanvasItem } from "./CanvasItem";
 import { createSVGElement } from "./../util";
 import { Overlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE, TextBlock } from "./text";
 
 
-export class CanvasSnippet
-extends CanvasChild
-implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
+export class CanvasSnippet extends CanvasItem implements IEventTarget {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem);
         this.truth = truth;
@@ -19,13 +17,15 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
         this.containerElement.appendChild(this.rectElement);
         this.containerElement.appendChild(this.textBlock.element);
 
-        this.overlay = new Overlay(this);
+        this.overlay = new Overlay();
 
         this.setupEventListeners();
     }
 
     private readonly truth: ICanvasSourceItem;
-    get id(): TId { return this.truth.id; }
+    public get id(): TId { return this.truth.id; }
+    public get parentId(): TId { return this.truth.parentId; }
+
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -61,7 +61,7 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
         this.color = this.truth.color;
         this.name = this.truth.name;
         this.textBlock.update(this.name, this);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -83,14 +83,14 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
     }
 
     public destroy(): void {
-        this.extractFromContainer();
+        this.unmount();
     }
 
     public moveTo(pos: IPoint): CanvasSnippet {
         this.x = pos.x;
         this.y = pos.y;
         this.textBlock.moveTo(pos);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -98,7 +98,7 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
         this.x += delta.x;
         this.y += delta.y;
         this.textBlock.moveBy(delta);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -106,7 +106,7 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
         this.width = size.width;
         this.height = size.height;
         this.textBlock.resize(size);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -116,17 +116,13 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
         return this;
     }
 
-    public showOverlay(options?: object): CanvasSnippet {
-        if (this._overlayIsShown) return this;
-        this._overlayIsShown = true;
-        this.containerElement.insertAdjacentElement("beforeend", this.overlay.element);
+    public showOverlay(): CanvasSnippet {
+        this.overlay.mount(this.containerElement);
         return this;
     }
 
     public hideOverlay(): CanvasSnippet {
-        if (!this._overlayIsShown) return this;
-        this._overlayIsShown = false;
-        this.containerElement.removeChild(this.overlay.element);
+        this.overlay.unmount();
         return this;
     }
 
@@ -138,7 +134,6 @@ implements ICanvasChild, ICanvasRectangle, INamedCanvasItem, IEventTarget {
     private readonly rectElement: SVGRectElement;
     private textBlock: TextBlock;
     private overlay: Overlay;
-    private _overlayIsShown = false;
 
     private _name: string = "";
     public get name(): string { return this._name; }

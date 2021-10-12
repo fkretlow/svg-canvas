@@ -7,13 +7,14 @@ export class Model implements IEventSource {
     public rectangles = new Array<Snippet | Block>();
     public elementMap = new Map<TId, Snippet | Block>();
 
-    public add(data: IRectangle & { type: "snippet" | "block" }) {
+    public add(data: IRectangle & { id?: TId, type: "snippet" | "block" }) {
         if (data.type === "snippet") {
             const snippet = new Snippet(data);
             this.elementMap.set(snippet.id, snippet);
             this.rectangles.push(snippet);
             this.dispatchEvent?.("item-added", { id: snippet.id });
         } else if (data.type === "block") {
+            console.log("Model: adding new block");
             const block = new Block(data);
             this.elementMap.set(block.id, block);
             this.rectangles.push(block);
@@ -84,6 +85,7 @@ export class Snippet implements IRectangle {
 
     constructor(obj: IRectangle) {
         Object.assign(this, obj);
+        console.log(this.id);
     }
 
     id = uuid();

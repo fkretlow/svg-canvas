@@ -1,11 +1,9 @@
-import { CanvasContainer, CanvasChild } from "./CanvasItem";
+import { CanvasItem } from "./CanvasItem";
 import { Overlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE } from "./text";
 import { createSVGElement } from "./../util";
 
-export class CanvasBlock
-extends CanvasChild
-implements ICanvasChild, ICanvasContainer, ICanvasRectangle, INamedCanvasItem, IEventTarget {
+export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem);
         this.truth = truth;
@@ -14,22 +12,19 @@ implements ICanvasChild, ICanvasContainer, ICanvasRectangle, INamedCanvasItem, I
         this.rectElement = this.createRectElement();
         this.containerElement.appendChild(this.rectElement);
 
-        this.overlay = new Overlay(this);
+        this.overlay = new Overlay();
 
         this.setupEventListeners();
     }
 
     private readonly truth: ICanvasSourceItem;
-    get id(): TId { return this.truth.id; }
 
-    readonly childIds: TId[] = [];
-    public readonly getChildren = CanvasContainer.prototype.getChildren.bind(this);
-    public readonly insertChildBefore = CanvasContainer.prototype.insertChildBefore.bind(this);
-    public readonly extractChild = CanvasContainer.prototype.extractChild.bind(this);
-    public readonly appendChild = CanvasContainer.prototype.appendChild.bind(this);
-    public readonly prependChild = CanvasContainer.prototype.prependChild.bind(this);
-    public readonly getNextChild = CanvasContainer.prototype.getNextChild.bind(this);
-    public readonly getPreviousChild = CanvasContainer.prototype.getPreviousChild.bind(this);
+    public get id(): TId { return this.truth.id; }
+
+    public get childIds(): Iterable<TId> { return this.truth.childIds; }
+    public *getChildren(): Generator<ICanvasItem> {
+        for (let id of this.childIds) yield this.getItem(id);
+    }
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -64,7 +59,7 @@ implements ICanvasChild, ICanvasContainer, ICanvasRectangle, INamedCanvasItem, I
         this.height = this.truth.height;
         this.color = this.truth.color;
         this.name = this.truth.name;
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -86,14 +81,14 @@ implements ICanvasChild, ICanvasContainer, ICanvasRectangle, INamedCanvasItem, I
     }
 
     public destroy(): void {
-        this.extractFromContainer();
+        this.unmount();
     }
 
     public moveTo(pos: IPoint): CanvasBlock {
         this.x = pos.x;
         this.y = pos.y;
         for (let child of this.getChildren()) child.moveTo(pos);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
@@ -101,14 +96,14 @@ implements ICanvasChild, ICanvasContainer, ICanvasRectangle, INamedCanvasItem, I
         this.x += delta.x;
         this.y += delta.y;
         for (let child of this.getChildren()) child.moveBy(delta);
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 
     public resize(size: ISize): CanvasBlock {
         this.width = size.width;
         this.height = size.height;
-        this.overlay.update();
+        this.overlay.update(this);
         return this;
     }
 

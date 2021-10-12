@@ -1,9 +1,9 @@
 import { v4 as uuid } from "uuid";
-import { CanvasContainer } from "./CanvasItem";
+import { CanvasItem } from "./CanvasItem";
 import { createSVGElement } from "./../util";
 
 
-export class CanvasRoot extends CanvasContainer {
+export class CanvasRoot extends CanvasItem {
     constructor(getItem: TCanvasItemGetter) {
         super(getItem);
         this.element = this.createSVGElement();
@@ -31,6 +31,19 @@ export class CanvasRoot extends CanvasContainer {
         return this;
     }
 
+    mountChild(id: TId): CanvasRoot {
+        const item = this.getItem(id);
+        console.log("root mounting child", item);
+        this.element.appendChild(item.element);
+        return this;
+    }
+
+    unmountChild(id: TId): CanvasRoot {
+        const item = this.getItem(id);
+        this.element.removeChild(item.element);
+        return this;
+    }
+
     private createSVGElement(): SVGElement {
         const element = createSVGElement("svg") as SVGElement;
         return element;
@@ -53,5 +66,4 @@ export class CanvasRoot extends CanvasContainer {
             });
         });
     }
-
 }

@@ -56,10 +56,14 @@
         receiver.on("item-resized", () => canvas.update());
         receiver.on("item-edited",  () => canvas.update());
 
-        wait(1000).then(() => model.add({ type: "snippet", ...makeRandomRectangle()}));
-        wait(2000).then(() => model.add({ type: "snippet", ...makeRandomRectangle()}));
-        wait(3000).then(() => model.add({ type: "snippet", ...makeRandomRectangle()}));
-        wait(4000).then(() => model.add({ type: "snippet", ...makeRandomRectangle()}));
+        wait(1000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
+        wait(2000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
+        wait(3000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
+        wait(4000).then(() => model.add({ type: "snippet", ...makeRandomRectangle(), id: "snippet_1" }));
+
+        wait(5000)
+            .then(() => model.add({ type: "block", ...makeRandomRectangle(), id: "block_1" }))
+            .then(() => model.insertIntoContainer("snippet_1", "block_1"));
     });
 </script>
 

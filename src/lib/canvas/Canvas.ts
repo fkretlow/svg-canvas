@@ -100,34 +100,6 @@ export class Canvas implements ICanvas {
             if (!this.items.has(part.id)) this.addItem(part);
         }
 
-        // update tree structure
-        for (let part of truthIds.values()) {
-            if (part.hasOwnProperty("childIds")) {
-                const truthChildIds = new Set(...part.childIds);
-                const item = this.getItem(part.id) as ICanvasContainer;
-                const itemChildIds = new Set(...item.childIds);
-                for (let childId of truthChildIds) {
-                    if (!itemChildIds.has(childId)){
-                        item.appendChild(childId);
-                    }
-                }
-                for (let childId of itemChildIds) {
-                    if (!truthChildIds.has(childId)) {
-                        item.extractChild(childId);
-                    }
-                }
-            }
-
-            else if (part.hasOwnProperty("parentId")) {
-                const parent = this.getItem(part.parentId) as ICanvasContainer;
-                const item = this.getItem(part.id) as ICanvasChild;
-                if (item.parentId !== parent.id) {
-                    if (item.parentId) item.extractFromContainer();
-                    parent.appendChild(item.id);
-                }
-            }
-        }
-
         // remove deleted
         for (let item of this.items.values()) {
             if (!truthIds.has(item.id) && !Object.is(item, this.root)) {
@@ -137,9 +109,6 @@ export class Canvas implements ICanvas {
 
         // update remaining
         for (let item of this.items.values()) {
-            if (item.hasOwnProperty("parentId") && (<ICanvasChild>item).parentId === null) {
-                this.root.appendChild(item.id);
-            }
             item.update();
         }
 
@@ -155,10 +124,8 @@ export class Canvas implements ICanvas {
         }
 
         this.registerItem(item);
+        this.root.mountChild(item.id);
         this.setupItemEventHandlers(item);
-
-        // const container = (this.getItem(item.parentId) || this.root) as ICanvasContainer;
-        // if (container) container.appendChild(item.id);
 
         return this;
     }
@@ -301,7 +268,17 @@ class DragItemState extends CanvasState {
     }
 
     handleMouseup(): CanvasState {
-        const items = [...this.canvas.selection].map(id => this.canvas.getItem(id));
+        const items = [];
+        for (let id of this.canvas.selection) {
+            const item = this.canvas.getItem(id);
+            items.push(item);
+            if (item.childIds) {
+                for (let id of item.childIds) {
+                    items.push(this.canvas.getItem(id));
+                }
+            }
+        }
+
         this.canvas.emitEvent("drop", {
             items: items.map((item: any) => {
                 return {
