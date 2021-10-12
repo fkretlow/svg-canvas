@@ -4,26 +4,48 @@ import chroma from "chroma-js";
 
 
 export class Model implements IEventSource {
-    public rectangles = new Array<Rectangle>();
-    public idToRectangle = new Map<TId, Rectangle>();
+    public rectangles = new Array<Snippet | Block>();
+    public elementMap = new Map<TId, Snippet | Block>();
 
-    public add(data: IRectangle) {
-        const rect = new Rectangle(data);
-        this.idToRectangle.set(rect.id, rect);
-        this.rectangles.push(rect);
-        this.dispatchEvent?.("item-added", { id: rect.id });
+    public add(data: IRectangle & { type: "snippet" | "block" }) {
+        if (data.type === "snippet") {
+            const snippet = new Snippet(data);
+            this.elementMap.set(snippet.id, snippet);
+            this.rectangles.push(snippet);
+            this.dispatchEvent?.("item-added", { id: snippet.id });
+        } else if (data.type === "block") {
+            const block = new Block(data);
+            this.elementMap.set(block.id, block);
+            this.rectangles.push(block);
+            this.dispatchEvent?.("item-added", { id: block.id });
+        }
+    }
+
+    public insertIntoContainer(childId: TId, containerId: TId) {
+        const child = this.elementMap.get(childId) as Snippet;
+        const container = this.elementMap.get(containerId) as Block;
+        child.parentId = containerId;
+        container.childIds.push(childId);
+    }
+
+    public extractFromContainer(childId: TId) {
+        const child = this.elementMap.get(childId) as Snippet;
+        if (!child.parentId) return;
+        const container = this.elementMap.get(child.parentId) as Block;
+        container.childIds = container.childIds.filter(id => id !== childId);
+        child.parentId = null;
     }
 
     public delete(id: TId): boolean {
         const i = this.rectangles.findIndex(r => r.id === id);
         if (i === -1) return false;
         this.rectangles.splice(i, 1);
-        this.idToRectangle.delete(id);
+        this.elementMap.delete(id);
         this.dispatchEvent?.("item-deleted", { id });
     }
 
     public move(id: TId, to: IPoint): boolean {
-        const rect = this.idToRectangle.get(id);
+        const rect = this.elementMap.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, to);
         this.dispatchEvent?.("item-moved", { id, to });
@@ -31,7 +53,7 @@ export class Model implements IEventSource {
     }
 
     public resize(id: TId, size: ISize): boolean {
-        const rect = this.idToRectangle.get(id);
+        const rect = this.elementMap.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, size);
         this.dispatchEvent?.("item-resized", { id, size });
@@ -39,7 +61,7 @@ export class Model implements IEventSource {
     }
 
     public changeColor(id: TId, color?: string): boolean {
-        const rect = this.idToRectangle.get(id);
+        const rect = this.elementMap.get(id);
         if (rect === undefined) return false;
         color = color || chroma.random().hex();
         rect.color = color;
@@ -57,12 +79,33 @@ export class Model implements IEventSource {
 }
 
 
-export class Rectangle {
+export class Snippet implements IRectangle {
+    readonly type = "snippet";
+
     constructor(obj: IRectangle) {
         Object.assign(this, obj);
     }
 
     id = uuid();
+    parentId: TId | null = null;
+    name: string = "unnamed";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color = chroma.random().hex();
+}
+
+
+export class Block implements IRectangle {
+    readonly type = "block";
+
+    constructor(obj: IRectangle) {
+        Object.assign(this, obj);
+    }
+
+    id = uuid();
+    childIds: TId[] = [];
     name: string = "unnamed";
     x: number;
     y: number;

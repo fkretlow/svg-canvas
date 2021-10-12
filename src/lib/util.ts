@@ -31,16 +31,32 @@ export function createSVGElement(
 }
 
 
+function createColorInLuminanceRange(min: number, max: number): chroma.Color {
+    let color = chroma.random();
+    let luminance = min + Math.random() * (max - min);
+    if (color.luminance() < luminance) {
+        while (color.luminance() < luminance) {
+            color = color.brighten();
+        }
+    } else {
+        while (color.luminance() > luminance) {
+            color = color.darken();
+        }
+    }
+    return color;
+}
+
+
 const _names = [ "apple", "banana", "pear", "ape", "table", "monitor", "formula", "love", "sea", "leaf" ];
 
 export function makeRandomRectangle(): IRectangle {
     let name = "";
-    for (let i = 0; i < randint(2,5); ++i) name += _names[randint(0, _names.length)] + " ";
+    for (let i = 0; i < randint(2,6); ++i) name += _names[randint(0, _names.length)] + " ";
     return {
         name,
         x: randint(20, 500), y: randint(20, 500),
         width: 100, height: 40,
-        color: chroma.random().hex(),
+        color: createColorInLuminanceRange(.6, .8).hex(),
     };
 }
 

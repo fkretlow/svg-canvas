@@ -1,5 +1,6 @@
 import { EventTargetMixin } from "./../events";
 import { CanvasSnippet } from "./CanvasSnippet";
+import { CanvasBlock } from "./CanvasBlock";
 import { CanvasRoot } from "./CanvasRoot";
 import { DynamicEventListener, EventListenerRegistry } from "./../events";
 
@@ -92,31 +93,72 @@ export class Canvas implements ICanvas {
     public update(): Canvas {
         const truthIds = this.processTruth();
 
-        // remove deleted, update remaining
-        for (let item of this.items.values()) {
-            if (!truthIds.has(item.id) && !Object.is(item, this.root)) {
-                this.deleteItem(item.id);
-            } else {
-                item.update();
-                truthIds.delete(item.id);
-            }
-        }
+        console.log("found", truthIds.size, "truth items");
 
         // add new items
         for (let part of truthIds.values()) {
             if (!this.items.has(part.id)) this.addItem(part);
         }
 
+        // update tree structure
+        for (let part of truthIds.values()) {
+            if (part.hasOwnProperty("childIds")) {
+                const truthChildIds = new Set(...part.childIds);
+                const item = this.getItem(part.id) as ICanvasContainer;
+                const itemChildIds = new Set(...item.childIds);
+                for (let childId of truthChildIds) {
+                    if (!itemChildIds.has(childId)){
+                        item.appendChild(childId);
+                    }
+                }
+                for (let childId of itemChildIds) {
+                    if (!truthChildIds.has(childId)) {
+                        item.extractChild(childId);
+                    }
+                }
+            }
+
+            else if (part.hasOwnProperty("parentId")) {
+                const parent = this.getItem(part.parentId) as ICanvasContainer;
+                const item = this.getItem(part.id) as ICanvasChild;
+                if (item.parentId !== parent.id) {
+                    if (item.parentId) item.extractFromContainer();
+                    parent.appendChild(item.id);
+                }
+            }
+        }
+
+        // remove deleted
+        for (let item of this.items.values()) {
+            if (!truthIds.has(item.id) && !Object.is(item, this.root)) {
+                this.deleteItem(item.id);
+            }
+        }
+
+        // update remaining
+        for (let item of this.items.values()) {
+            if (item.hasOwnProperty("parentId") && (<ICanvasChild>item).parentId === null) {
+                this.root.appendChild(item.id);
+            }
+            item.update();
+        }
+
         return this;
     }
 
     public addItem(source: ICanvasSourceItem): Canvas {
-        const item = new CanvasSnippet(id => this.getItem(id), source);
+        let item: ICanvasItem;
+        if (source.hasOwnProperty("childIds")) {
+            item = new CanvasBlock(id => this.getItem(id), source);
+        } else {
+            item = new CanvasSnippet(id => this.getItem(id), source);
+        }
+
         this.registerItem(item);
         this.setupItemEventHandlers(item);
 
-        const container = (this.getItem(item.parentId) || this.root) as ICanvasContainer;
-        if (container) container.appendChild(item.id);
+        // const container = (this.getItem(item.parentId) || this.root) as ICanvasContainer;
+        // if (container) container.appendChild(item.id);
 
         return this;
     }
@@ -148,7 +190,7 @@ export class Canvas implements ICanvas {
         return this;
     }
 
-    private setupItemEventHandlers(item: CanvasSnippet): void {
+    private setupItemEventHandlers(item: ICanvasItem): void {
         item.on("mousedown", (e: MouseEvent) => {
             this.transition("mousedown", { targetId: item.id, domEvent: e });
         });
@@ -228,12 +270,12 @@ class ReadyState extends CanvasState {
         if (!this.canvas.selection.has(targetId)) {
             this.canvas.select(targetId, domEvent.shiftKey);
         }
-        return new DragState(this.canvas);
+        return new DragItemState(this.canvas);
     }
 }
 
 
-class DragState extends CanvasState {
+class DragItemState extends CanvasState {
     readonly events = new Set(["mousemove", "mouseup"]);
 
     private hasMoved: boolean = false;

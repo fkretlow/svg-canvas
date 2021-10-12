@@ -18,7 +18,7 @@ export class Overlay {
         this.rectElement.setAttribute("y", `${this.item.y}px`);
         this.rectElement.setAttribute("width", `${this.item.width}px`);
         this.rectElement.setAttribute("height", `${this.item.height}px`);
-        this.rectElement.setAttribute("stroke", "orange");
+        this.rectElement.setAttribute("stroke", "#007acc");
         this.rectElement.setAttribute("stroke-width", "2px");
     }
 

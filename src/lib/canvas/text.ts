@@ -77,17 +77,36 @@ export class TextBlock {
         this.height = shape.height;
         this.text = text;
         this.wrap();
-        if (this.containerElement.parentElement && this.containerElement.viewportElement) {
-            const rootbb = this.containerElement.viewportElement.getBoundingClientRect();
-            const bb = this.containerElement.getBoundingClientRect();
-            const dy = this.y - (bb.y - rootbb.y);
-            this.y += dy;
-        }
+    }
+
+    public moveTo(pos: IPoint): TextBlock {
+        this.x = pos.x;
+        this.y = pos.y;
+        return this;
+    }
+
+    public moveBy(delta: IPoint): TextBlock {
+        this.x += delta.x;
+        this.y += delta.y;
+        return this;
+    }
+
+    public resize(size: ISize): TextBlock {
+        this.width = size.width;
+        this.height = size.height;
+        this.wrap();
+        return this;
+    }
+
+    public editText(text: string): TextBlock {
+        this.text = text;
+        return this;
     }
 
     public get element(): SVGElement {
         return this.containerElement;
     }
+
     private containerElement: SVGGElement;
 
     private createContainerElement(): SVGGElement {
@@ -107,12 +126,16 @@ export class TextBlock {
             this.containerElement.removeChild(this.containerElement.children[0]);
         }
 
+        if (this.lines.length === 0) return;
+
+        const ascent = measureText(this.lines[0], this.style).actualBoundingBoxAscent;
+
         for (let i = 0; i < this.lines.length; ++i) {
             const line = this.lines[i];
             const text = createSVGElement("text");
             text.textContent = line;
             text.setAttribute("x", `${this.x}px`);
-            text.setAttribute("y", `${this.y}px`);
+            text.setAttribute("y", `${this.y + ascent}px`);
             text.setAttribute("dy", `${i * this.style["line-height"]}px`);
             this.containerElement.appendChild(text);
         }
@@ -122,7 +145,7 @@ export class TextBlock {
     public get text(): string {
         return this._text;
     }
-    public set text(text: string) {
+    private set text(text: string) {
         this._text = text;
     }
 
@@ -138,7 +161,7 @@ export class TextBlock {
 
     private _x: number = 0;
     public get x(): number { return this._x; }
-    public set x(x: number) {
+    private set x(x: number) {
         this._x = x;
         for (let i = 0; i < this.containerElement.children.length; ++i) {
             const text = this.containerElement.children[i];
@@ -148,34 +171,26 @@ export class TextBlock {
 
     private _y: number = 0;
     public get y(): number { return this._y; }
-    public set y(y: number) {
+    private set y(y: number) {
         this._y = y;
+        if (this.lines.length === 0) return;
+        const ascent = measureText(this.lines[0], this.style).actualBoundingBoxAscent;
         for (let i = 0; i < this.containerElement.children.length; ++i) {
             const text = this.containerElement.children[i];
-            text.setAttribute("y", `${y}px`);
+            text.setAttribute("y", `${y + ascent}px`);
         }
     }
 
     private _width: number = 0;
     public get width(): number { return this._width; }
-    public set width(width: number) {
+    private set width(width: number) {
         this._width = width;
         this.lines = textWrap(this.text, { width: this.width }, this.style);
     }
 
     private _height: number = 0;
     public get height(): number { return this._height; }
-    public set height(height: number) {
+    private set height(height: number) {
         this._height = height;
-    }
-
-    public getActualSize(): ISize {
-        if (!this.containerElement.parentElement)
-            throw new Error(`TextBlock.getActualSize: cannot compute size: not mounted`);
-        const bb = this.containerElement.getBoundingClientRect();
-        return {
-            width: bb.width,
-            height: bb.height,
-        };
     }
 }

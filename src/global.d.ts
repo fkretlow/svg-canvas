@@ -91,6 +91,7 @@ interface ICanvas {
 
 interface ICanvasSourceItem {
     id: TId;
+    type: "snippet" | "block";
     x: number;
     y: number;
     width: number;
