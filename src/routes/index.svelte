@@ -41,6 +41,10 @@
         canvas.on("delete", (event: IEvent) => {
             model.delete(event.detail!.id);
         });
+
+        canvas.on("resize", (event: IEvent) => {
+            model.resize(event.detail.id, event.detail.position, event.detail.size);
+        });
     });
 </script>
 

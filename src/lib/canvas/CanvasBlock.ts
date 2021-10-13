@@ -42,7 +42,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private fontStyle: IFontStyle = DEFAULT_FONT_STYLE;
 
     private setupEventListeners(): void {
-        // TODO: Do this properly...
         const mouseEventTypes = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
         mouseEventTypes.forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
@@ -50,7 +49,7 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
             });
         });
 
-        this.overlay.on("mousedown", (e: IEvent) => this.emitEvent(e.type, e.detail));
+        this.overlay.on("mousedown", (e: IEvent) => this.emitEvent(e.type, { targetId: this.id, ...e.detail }));
     }
 
     public update(): CanvasBlock {
@@ -61,6 +60,32 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.color = this.truth.color;
         this.name = this.truth.name;
         this.overlay.update(this);
+        return this;
+    }
+
+    public resize(delta: IPoint, anchor: "nw" | "ne" | "se" | "sw"): CanvasBlock {
+        let x = this.x;
+        let y = this.y;
+        let width = this.width;
+        let height = this.height;
+
+        if (isWest(anchor))     x += delta.x;
+        if (isNorth(anchor))    y += delta.y;
+
+        if (isWest(anchor))     width -= delta.x;
+        else                    width += delta.x;
+
+        if (isNorth(anchor))    height -= delta.y;
+        else                    height += delta.y;
+
+        if (isNorth(anchor))    this.y = y;
+        if (isWest(anchor))     this.x = x;
+
+        if (isWest(anchor) || isEast(anchor))   this.width = width;
+        if (isNorth(anchor) || isSouth(anchor)) this.height = height;
+
+        this.overlay.update(this);
+
         return this;
     }
 
@@ -97,13 +122,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.x += delta.x;
         this.y += delta.y;
         for (let child of this.getChildren()) child.moveBy(delta);
-        this.overlay.update(this);
-        return this;
-    }
-
-    public resize(size: ISize): CanvasBlock {
-        this.width = size.width;
-        this.height = size.height;
         this.overlay.update(this);
         return this;
     }
@@ -145,7 +163,7 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
 
     private readonly containerElement: SVGGElement;
     private readonly rectElement: SVGRectElement;
-    private overlay: Overlay;
+    private overlay: ResizeOverlay;
     private _overlayIsShown = false;
 
     private _name: string = "";
@@ -189,3 +207,9 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.rectElement.style.setProperty("fill", color);
     }
 }
+
+
+function isNorth(anchor: TAnchorKey): boolean { return anchor.startsWith("n"); }
+function isEast(anchor: TAnchorKey): boolean  { return anchor.endsWith("e"); }
+function isSouth(anchor: TAnchorKey): boolean { return anchor.startsWith("s"); }
+function isWest(anchor: TAnchorKey): boolean  { return anchor.endsWith("w"); }

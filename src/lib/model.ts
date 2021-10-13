@@ -65,11 +65,12 @@ export class Model implements IEventSource {
         return true;
     }
 
-    public resize(id: TId, size: ISize): boolean {
+    public resize(id: TId, pos: IPoint, size: ISize): boolean {
         const rect = this.elementMap.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, size);
-        this.dispatchEvent?.("item-resized", { id, size });
+        Object.assign(rect, pos);
+        this.dispatchEvent?.("item-resized", { id });
         return true;
     }
 

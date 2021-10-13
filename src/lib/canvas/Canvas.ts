@@ -256,12 +256,12 @@ class ReadyState extends CanvasState {
             }
             return new DragItemState(this.canvas);
 
-        } else if (e.detail!.targetType.startsWith("overlay-handle")) {
+        } else if (e.detail!.targetType === "overlay-handle") {
             const targetId = e.detail.targetId;
             this.canvas.selection.forEach(id => {
                 if (id !== targetId) this.canvas.deselect(id);
             });
-            return new ResizeItemState(this, e.detail.targetType);
+            return new ResizeItemState(this.canvas, targetId, e.detail!.anchor);
         } else {
             return this;
         }
@@ -340,10 +340,43 @@ class DragItemState extends CanvasState {
 
 
 class ResizeItemState extends CanvasState {
-    constructor(canvas: Canvas, handle: string) {
+    private anchor: string;
+    private target: ICanvasItem & IRectangle & { resize: (delta: IPoint, anchor: string) => any };
+    private hasResized = false;
+
+    constructor(canvas: Canvas, targetId: TId, anchor: string) {
         super(canvas);
-        this.handle = handle;
+        this.anchor = anchor;
+        this.target = this.canvas.getItem(targetId) as any;
     }
 
-    private handle: string;
+    transition(e: IEvent): CanvasState {
+        switch (e.type) {
+            case "mousemove":
+                return this.handleMousemove(e);
+            case "mouseup":
+                return this.handleMouseup(e);
+            default:
+                return this;
+        }
+    }
+
+    private handleMousemove(e: IEvent) {
+        if (!this.hasResized) this.hasResized = true;
+        const delta = {
+            x: e.detail!.domEvent.movementX,
+            y: e.detail!.domEvent.movementY,
+        };
+        this.target.resize(delta, this.anchor);
+        return this;
+    }
+
+    private handleMouseup(e: IEvent) {
+        if (this.hasResized) this.canvas.emitEvent("resize", {
+                id: this.target.id,
+                position: { x: this.target.x, y: this.target.y },
+                size: { width: this.target.width, height: this.target.height },
+        });
+        return new ReadyState(this.canvas);
+    }
 }

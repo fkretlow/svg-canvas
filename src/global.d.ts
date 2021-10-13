@@ -137,7 +137,7 @@ interface ICanvasItem {
     moveTo?(pos: IPoint): ICanvasItem;
     moveBy?(delta: IPoint): ICanvasItem;
 
-    resize?(size: ISize): ICanvasItem;
+    resize?(delta: IPoint, anchor: string): ICanvasItem;
     rename?(name: string): ICanvasItem;
 
     moveForwards?(): ICanvasItem;

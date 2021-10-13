@@ -61,10 +61,10 @@ export class Overlay {
 export class ResizeOverlay extends Overlay {
     constructor() {
         super();
-        this.handleNW = this.createHandle();
-        this.handleNE = this.createHandle();
-        this.handleSE = this.createHandle();
-        this.handleSW = this.createHandle();
+        this.handleNW = this.createHandle("nw");
+        this.handleNE = this.createHandle("ne");
+        this.handleSE = this.createHandle("se");
+        this.handleSW = this.createHandle("sw");
         this.groupElement.appendChild(this.handleNW);
         this.groupElement.appendChild(this.handleNE);
         this.groupElement.appendChild(this.handleSE);
@@ -94,12 +94,14 @@ export class ResizeOverlay extends Overlay {
     private handleSE: SVGCircleElement;
     private handleSW: SVGCircleElement;
 
-    private createHandle(): SVGCircleElement {
+    private createHandle(anchor: "nw" | "ne" | "se" | "sw"): SVGCircleElement {
         const circle = createSVGElement("circle") as SVGCircleElement;
         circle.setAttribute("fill", "white");
         circle.setAttribute("stroke", "#007acc");
         circle.setAttribute("stroke-width", "1px");
         circle.setAttribute("r", "5px");
+        const cursor = anchor === "nw" || anchor === "se" ? "nwse-resize" : "nesw-resize";
+        circle.style.setProperty("cursor", cursor);
         return circle;
     }
 
@@ -118,16 +120,16 @@ export class ResizeOverlay extends Overlay {
 
     private setupEventListeners(): void {
         this.handleNW.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle-nw", domEvent: e });
+            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "nw", domEvent: e });
         });
         this.handleNE.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle-ne", domEvent: e });
+            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "ne", domEvent: e });
         });
         this.handleSE.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle-se", domEvent: e });
+            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "se", domEvent: e });
         });
         this.handleSW.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle-sw", domEvent: e });
+            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "sw", domEvent: e });
         });
     }
 }
