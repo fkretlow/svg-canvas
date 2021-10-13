@@ -30,6 +30,7 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
         g.style.setProperty("contain", "paint");
+        g.setAttribute("data-ref-id", this.truth.id);
         return g;
     }
 
@@ -47,8 +48,7 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
         const mouseEventTypes = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
         mouseEventTypes.forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                const handlers = this.eventTargetMixin.getHandlers(type);
-                handlers?.forEach(handler => handler(e));
+                this.emitEvent(type, { targetType: "item", targetId: this.id, domEvent: e });
             });
         });
     }

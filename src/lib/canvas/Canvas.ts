@@ -2,12 +2,12 @@ import { EventTargetMixin } from "./../events";
 import { CanvasSnippet } from "./CanvasSnippet";
 import { CanvasBlock } from "./CanvasBlock";
 import { CanvasRoot } from "./CanvasRoot";
-import { DynamicEventListener, EventListenerRegistry } from "./../events";
+import { isPointInRectangle } from "./../util";
 
 
-export class Canvas implements ICanvas {
+export class Canvas implements ICanvas, IEventListener {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
-        this.setupEventListeners();
+        // this.setupEventListeners();
         this.root = new CanvasRoot((id: TId) => this.getItem(id));
         this.setupRootEventHandlers(this.root);
         this.registerItem(this.root);
@@ -15,9 +15,9 @@ export class Canvas implements ICanvas {
         if (parent) this.mount(parent);
     }
 
-    private truth: Iterable<ICanvasSourceItem> | null = null;
-    private readonly root: CanvasRoot;
-    private readonly options: ICanvasOptions = {};
+    truth: Iterable<ICanvasSourceItem> | null = null;
+    readonly root: CanvasRoot;
+    readonly options: ICanvasOptions = {};
 
     /*
      * Event Handling
@@ -58,12 +58,15 @@ export class Canvas implements ICanvas {
         return this;
     }
 
-    public deselect(id: TId): Canvas {
-        const item = this.getItem(id);
-        if (!item) throw new Error(`Canvas.deselect: item not found`);
-        this.selection.delete(id);
-        item.deselect();
-        this.emitEvent("deselect", { id });
+    public deselect(id?: TId): Canvas {
+        const ids: Iterable<TId> = id !== undefined ? [ id ] : this.selection;
+        for (let id of ids) {
+            const item = this.getItem(id);
+            if (!item) throw new Error(`Canvas.deselect: item not found`);
+            this.selection.delete(id);
+            item.deselect();
+        }
+        this.emitEvent("deselect", { ids });
         return this;
     }
 
@@ -92,8 +95,6 @@ export class Canvas implements ICanvas {
 
     public update(): Canvas {
         const truthIds = this.processTruth();
-
-        console.log("found", truthIds.size, "truth items");
 
         // add new items
         for (let part of truthIds.values()) {
@@ -158,22 +159,55 @@ export class Canvas implements ICanvas {
     }
 
     private setupItemEventHandlers(item: ICanvasItem): void {
-        item.on("mousedown", (e: MouseEvent) => {
-            this.transition("mousedown", { targetId: item.id, domEvent: e });
-        });
+        item.on("mousedown", (e: IEvent) => this.handleInternalEvent(e));
     }
 
     private setupRootEventHandlers(root: CanvasRoot): void {
-        root.on("mouseup", () => this.clearSelection());
+        [ "mousedown", "mouseup", "mousemove", "dblclick" ].forEach(type => {
+            root.on(type, (e: IEvent) => this.handleInternalEvent(e));
+        });
     }
 
+    public findItemsAt(pos: IPoint): TId[] {
+        const items = Array.from(this.items.keys()).filter((id: TId) => {
+            const item = this.getItem(id) as any;
+            return !Object.is(item, this.root) && isPointInRectangle(pos.x, pos.y, item);
+        });
+        return items;
+    }
+
+    public calculateItemDepth(id: TId): number {
+        let item = this.getItem(id);
+        let depth = 0;
+        while (item.hasOwnProperty("parentId") && item.parentId !== null) {
+            ++depth;
+            item = this.getItem(item.parentId);
+        }
+        return depth;
+    }
+
+    public findLowestContainerAt(pos: IPoint): TId | null {
+        const ids = this.findItemsAt(pos);
+        let maxDepth = -1;
+        let resultId: TId | null = null;
+        for (let i = 0; i < ids.length; ++i) {
+            const item = this.getItem(ids[i]) as any;
+            if (item.childIds === undefined) break;
+            const depth = this.calculateItemDepth(item.id);
+            if (depth > maxDepth) {
+                resultId = item.id;
+                maxDepth = depth;
+            }
+        }
+        return resultId;
+    }
 
     /*
      * State machine
      */
     private state: CanvasState = new ReadyState(this);
-    public transition(type: TEventType, detail?: TEventDetail): void {
-        const newState = this.state.transition(type, detail);
+    public handleInternalEvent(e: IEvent): void {
+        const newState = this.state.transition(e);
         if (!Object.is(newState, this.state)) {
             this.state.exit();
             this.state = newState;
@@ -181,112 +215,135 @@ export class Canvas implements ICanvas {
         }
     }
 
-    public setEventMask(keys: Iterable<string>): void {
-        this.eventListeners.setEventMask(keys);
-    }
-    private readonly eventListeners = new EventListenerRegistry();
-    private setupEventListeners(): void {
-        this.eventListeners.registerEventListener("mousemove", new DynamicEventListener(
-            window,
-            "mousemove",
-            (e: MouseEvent) => {
-                e.stopPropagation();
-                const delta = { x: e.movementX, y: e.movementY };
-                this.transition("mousemove", { delta });
-            },
-            { capture: true },
-        ));
+    /*
+     * Incoming Domain Events
+     */
+    notify(event: IEvent) { this.update(); }
 
-        this.eventListeners.registerEventListener("mouseup", new DynamicEventListener(
-            window,
-            "mouseup",
-            (e: MouseEvent) => {
-                e.stopPropagation();
-                this.transition("mouseup");
-            },
-            { capture: true },
-        ));
+    readonly eventTypes = {
+        receiving: new Set([ "item-added", "item-moved", "item-deleted", "item-resized", "item-edited" ]),
     }
 }
 
 
 abstract class CanvasState {
     constructor(protected canvas: Canvas) {}
-    abstract transition(type: TEventType, detail?: TEventDetail): CanvasState;
-    enter(): void {
-        this.canvas.setEventMask(this.events);
-    };
+    abstract transition(e: IEvent): CanvasState;
+    enter(): void {};
     exit(): void {};
-    abstract readonly events: Iterable<string>;
 }
 
 
 class ReadyState extends CanvasState {
-    readonly events = new Set(["mousedown"]);
-
-    transition(type: TEventType, detail?: TEventDetail): CanvasState {
-        switch (type) {
+    transition(e: IEvent): CanvasState {
+        switch (e.type) {
             case "mousedown":
-                return this.handleMousedown(detail);
+                return this.handleMousedown(e);
+            case "mouseup":
+                return this.handleMouseup(e);
+            case "dblclick":
+                return this.handleDblclick(e);
             default:
                 return this;
         }
     }
 
-    private handleMousedown({ targetId, domEvent }: any): CanvasState {
-        if (!this.canvas.selection.has(targetId)) {
-            this.canvas.select(targetId, domEvent.shiftKey);
+    private handleMousedown(e: IEvent): CanvasState {
+        if (e.detail!.targetType === "item") {
+            if (!this.canvas.selection.has(e.detail!.targetId)) {
+                const isMultiple = e.detail!.domEvent.shiftKey;
+                this.canvas.select(e.detail!.targetId, isMultiple);
+            }
+            return new DragItemState(this.canvas);
+
+        } else if (e.detail!.targetType.startsWith("overlay-handle")) {
+            const targetId = e.detail.targetId;
+            this.canvas.selection.forEach(id => {
+                if (id !== targetId) this.canvas.deselect(id);
+            });
+            return new ResizeItemState(this, e.detail.targetType);
+        } else {
+            return this;
         }
-        return new DragItemState(this.canvas);
+    }
+
+    private handleMouseup(e: IEvent): CanvasState {
+        if (e.detail!.targetType === "canvas") {
+            this.canvas.deselect();
+        }
+        return this;
+    }
+
+    private handleDblclick(e: IEvent): CanvasState {
+        if (e.detail!.targetType === "canvas") {
+            const isBlock = e.detail!.domEvent.altKey;
+            this.canvas.emitEvent("add", {
+                type: isBlock ? "block" : "snippet",
+                position: { x: e.detail!.domEvent.offsetX, y: e.detail!.domEvent.offsetY },
+            });
+            return this;
+        }
     }
 }
 
 
 class DragItemState extends CanvasState {
-    readonly events = new Set(["mousemove", "mouseup"]);
-
     private hasMoved: boolean = false;
-    transition(type: TEventType, detail?: TEventDetail): CanvasState {
-        switch (type) {
+
+    transition(e: IEvent): CanvasState {
+        switch (e.type) {
             case "mousemove":
-                return this.handleMousemove(detail);
+                return this.handleMousemove(e);
             case "mouseup":
-                return this.handleMouseup();
+                return this.handleMouseup(e);
             default:
                 return this;
         }
     }
 
-    handleMousemove({ delta }: { delta: IPoint }): CanvasState {
+    handleMousemove(e: IEvent): CanvasState {
         const items = Array.from(this.canvas.getSelectedItems());
         if (!this.hasMoved) {
             this.hasMoved = true;
             items.forEach((item: any) => item.moveToTheFront?.());
         }
+        const delta = { x: e.detail!.domEvent.movementX, y: e.detail!.domEvent.movementY };
         items.forEach((item: any) => item.moveBy?.(delta));
         return this;
     }
 
-    handleMouseup(): CanvasState {
-        const items = [];
-        for (let id of this.canvas.selection) {
-            const item = this.canvas.getItem(id);
-            items.push(item);
-            if (item.childIds) {
-                for (let id of item.childIds) {
-                    items.push(this.canvas.getItem(id));
+    handleMouseup(e: IEvent): CanvasState {
+        if (this.hasMoved) {
+            const items = [];
+            for (let id of this.canvas.selection) {
+                const item = this.canvas.getItem(id);
+                items.push(item);
+                if (item.childIds) {
+                    for (let id of item.childIds) {
+                        items.push(this.canvas.getItem(id));
+                    }
                 }
             }
-        }
 
-        this.canvas.emitEvent("drop", {
-            items: items.map((item: any) => {
-                return {
-                    id: item.id,
-                    position: { x: item.x, y: item.y }
-                };
-            }),
-        });
+            this.canvas.emitEvent("drop", {
+                items: items.map((item: any) => {
+                    return {
+                        id: item.id,
+                        position: { x: item.x, y: item.y },
+                    };
+                }),
+            });
+        }
         return new ReadyState(this.canvas);
     }
+}
+
+
+class ResizeItemState extends CanvasState {
+    constructor(canvas: Canvas, handle: string) {
+        super(canvas);
+        this.handle = handle;
+    }
+
+    private handle: string;
 }

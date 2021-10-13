@@ -33,7 +33,6 @@ export class CanvasRoot extends CanvasItem {
 
     mountChild(id: TId): CanvasRoot {
         const item = this.getItem(id);
-        console.log("root mounting child", item);
         this.element.appendChild(item.element);
         return this;
     }
@@ -61,8 +60,7 @@ export class CanvasRoot extends CanvasItem {
         const mouseEventTypes = [ "click", "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
         mouseEventTypes.forEach(type => {
             this.element.addEventListener(type, (e: MouseEvent) => {
-                const handlers = this.eventTargetMixin.getHandlers(type);
-                handlers?.forEach(handler => handler(e));
+                this.emitEvent(type, { targetType: "canvas", targetId: this.id, domEvent: e });
             });
         });
     }

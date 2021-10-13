@@ -79,6 +79,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
 
         parent.removeChild(this.element);
         parent.insertAdjacentElement("beforeend", this.element)
+
         return this;
     }
 

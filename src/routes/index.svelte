@@ -1,12 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { Canvas } from "$lib/canvas/Canvas";
-    import { EventBus, EventReceiver } from "$lib/events";
+    import { EventBus } from "$lib/events";
     import { Model } from "$lib/model";
-    import { wait, makeRandomRectangle } from "$lib/util";
 
     let bus: EventBus;
-    let receiver: EventReceiver;
     let model: Model;
     let canvas: Canvas;
 
@@ -26,8 +24,13 @@
                 "border": "1px solid rgba(0,0,0,.2)",
             }
         });
+        bus.registerListener(canvas);
 
         canvas.setTruth(model.rectangles);
+
+        canvas.on("add", (event: IEvent) => {
+            model.add({ type: event.detail.type, ...event.detail.position });
+        });
 
         canvas.on("drop", (event: IEvent) => {
             event.detail.items.forEach(({ id, position }) => {
@@ -38,32 +41,6 @@
         canvas.on("delete", (event: IEvent) => {
             model.delete(event.detail!.id);
         });
-
-        canvas.on("select", (event: IEvent) => {
-            console.log("selected item", event.detail!.id);
-        });
-
-        canvas.on("deselect", (event: IEvent) => {
-            console.log("deselected item", event.detail!.id);
-        })
-
-        receiver = new EventReceiver();
-        bus.registerListener(receiver);
-
-        receiver.on("item-added",   () => canvas.update());
-        receiver.on("item-deleted", () => canvas.update());
-        receiver.on("item-moved",   () => canvas.update());
-        receiver.on("item-resized", () => canvas.update());
-        receiver.on("item-edited",  () => canvas.update());
-
-        wait(1000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
-        wait(2000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
-        wait(3000).then(() => model.add({ type: "snippet", ...makeRandomRectangle() }));
-        wait(4000).then(() => model.add({ type: "snippet", ...makeRandomRectangle(), id: "snippet_1" }));
-
-        wait(5000)
-            .then(() => model.add({ type: "block", ...makeRandomRectangle(), id: "block_1" }))
-            .then(() => model.insertIntoContainer("snippet_1", "block_1"));
     });
 </script>
 

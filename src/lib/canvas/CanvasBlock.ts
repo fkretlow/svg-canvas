@@ -1,5 +1,5 @@
 import { CanvasItem } from "./CanvasItem";
-import { Overlay } from "./Overlay";
+import { ResizeOverlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE } from "./text";
 import { createSVGElement } from "./../util";
 
@@ -12,8 +12,7 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.rectElement = this.createRectElement();
         this.containerElement.appendChild(this.rectElement);
 
-        this.overlay = new Overlay();
-
+        this.overlay = new ResizeOverlay();
         this.setupEventListeners();
     }
 
@@ -29,6 +28,7 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
         g.style.setProperty("contain", "paint");
+        g.setAttribute("data-ref-id", this.truth.id);
         return g;
     }
 
@@ -46,10 +46,11 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         const mouseEventTypes = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
         mouseEventTypes.forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                const handlers = this.eventTargetMixin.getHandlers(type);
-                handlers?.forEach(handler => handler(e));
+                this.emitEvent(type, { targetType: "item", targetId: this.id, domEvent: e });
             });
         });
+
+        this.overlay.on("mousedown", (e: IEvent) => this.emitEvent(e.type, e.detail));
     }
 
     public update(): CanvasBlock {
@@ -123,6 +124,18 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         if (!this._overlayIsShown) return this;
         this._overlayIsShown = false;
         this.containerElement.removeChild(this.overlay.element);
+        return this;
+    }
+
+    public moveToTheFront(): CanvasBlock {
+        const parent = this.element.parentElement;
+        if (parent === null) return this;
+
+        parent.removeChild(this.element);
+        parent.insertAdjacentElement("beforeend", this.element)
+
+        for (let child of this.getChildren()) child.moveToTheFront();
+
         return this;
     }
 

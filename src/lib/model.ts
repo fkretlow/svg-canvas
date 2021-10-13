@@ -1,5 +1,6 @@
 import { v4 as uuid } from "uuid";
 import chroma from "chroma-js";
+import {isPointInRectangle} from "./util";
 
 
 
@@ -7,14 +8,18 @@ export class Model implements IEventSource {
     public rectangles = new Array<Snippet | Block>();
     public elementMap = new Map<TId, Snippet | Block>();
 
-    public add(data: IRectangle & { id?: TId, type: "snippet" | "block" }) {
+    public add(data: {
+        type: "snippet" | "block",
+        id?: TId,
+        x: number,
+        y: number,
+    }) {
         if (data.type === "snippet") {
             const snippet = new Snippet(data);
             this.elementMap.set(snippet.id, snippet);
             this.rectangles.push(snippet);
             this.dispatchEvent?.("item-added", { id: snippet.id });
         } else if (data.type === "block") {
-            console.log("Model: adding new block");
             const block = new Block(data);
             this.elementMap.set(block.id, block);
             this.rectangles.push(block);
@@ -50,6 +55,13 @@ export class Model implements IEventSource {
         if (rect === undefined) return false;
         Object.assign(rect, to);
         this.dispatchEvent?.("item-moved", { id, to });
+
+        if (rect instanceof Snippet) {
+            if (rect.parentId !== null) this.extractFromContainer(id);
+            const blockId = this.getBlockAt(to);
+            if (blockId) this.insertIntoContainer(id, blockId);
+        }
+
         return true;
     }
 
@@ -70,6 +82,13 @@ export class Model implements IEventSource {
         return true;
     }
 
+    private getBlockAt(pos: IPoint): TId | null {
+        for (let item of this.rectangles.values()) {
+            if (item instanceof Block && isPointInRectangle(pos.x, pos.y, item)) return item.id;
+        }
+        return null;
+    }
+
     private dispatchEvent: TEventDispatcher | null = null;
     public setEventDispatcher(dispatcher: TEventDispatcher): void {
         this.dispatchEvent = dispatcher;
@@ -83,35 +102,52 @@ export class Model implements IEventSource {
 export class Snippet implements IRectangle {
     readonly type = "snippet";
 
-    constructor(obj: IRectangle) {
-        Object.assign(this, obj);
-        console.log(this.id);
+    constructor(data: {
+        x: number, y: number,
+        id?: TId,
+        name?: string,
+        color?: string,
+    }) {
+        this.x = data.x;
+        this.y = data.y;
+        if (data.id) this.id = data.id;
+        if (data.name) this.name = data.name;
+        if (data.color) this.color = data.color;
     }
 
     id = uuid();
     parentId: TId | null = null;
-    name: string = "unnamed";
+    name: string = "Snippet";
     x: number;
     y: number;
-    width: number;
-    height: number;
-    color = chroma.random().hex();
+    width = 100;
+    height = 40;
+    color = "orange";
 }
 
 
 export class Block implements IRectangle {
     readonly type = "block";
 
-    constructor(obj: IRectangle) {
-        Object.assign(this, obj);
+    constructor(data: {
+        x: number, y: number,
+        id?: TId,
+        name?: string,
+        color?: string,
+    }) {
+        this.x = data.x;
+        this.y = data.y;
+        if (data.id) this.id = data.id;
+        if (data.name) this.name = data.name;
+        if (data.color) this.color = data.color;
     }
 
     id = uuid();
     childIds: TId[] = [];
-    name: string = "unnamed";
+    name: string = "Block";
     x: number;
     y: number;
-    width: number;
-    height: number;
-    color = chroma.random().hex();
+    width = 200;
+    height = 150;
+    color = "lightgray"
 }

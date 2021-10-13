@@ -1,4 +1,6 @@
-import { createSVGElement } from "$lib/util";
+import { createSVGElement } from "./../util";
+import { EventTargetMixin } from "./../events";
+
 
 export class Overlay {
     constructor() {
@@ -7,9 +9,9 @@ export class Overlay {
         this.groupElement.appendChild(this.rectElement);
     }
 
-    private _isMounted: boolean = false;
+    protected _isMounted: boolean = false;
     public get isMounted(): boolean { return this._isMounted; }
-    private set isMounted(b: boolean) { this._isMounted = b; }
+    protected set isMounted(b: boolean) { this._isMounted = b; }
 
     public get element(): SVGGElement {
         return this.groupElement;
@@ -39,10 +41,10 @@ export class Overlay {
         return this;
     }
 
-    private rectElement: SVGRectElement;
-    private groupElement: SVGGElement;
+    protected rectElement: SVGRectElement;
+    protected groupElement: SVGGElement;
 
-    private createRectElement(): SVGRectElement {
+    protected createRectElement(): SVGRectElement {
         const rect = createSVGElement("rect") as SVGRectElement;
         rect.setAttribute("fill", "none");
         rect.setAttribute("stroke", "#007acc");
@@ -50,7 +52,82 @@ export class Overlay {
         return rect;
     }
 
-    private createGroupElement(): SVGGElement {
+    protected createGroupElement(): SVGGElement {
         return createSVGElement("g") as SVGGElement;
+    }
+}
+
+
+export class ResizeOverlay extends Overlay {
+    constructor() {
+        super();
+        this.handleNW = this.createHandle();
+        this.handleNE = this.createHandle();
+        this.handleSE = this.createHandle();
+        this.handleSW = this.createHandle();
+        this.groupElement.appendChild(this.handleNW);
+        this.groupElement.appendChild(this.handleNE);
+        this.groupElement.appendChild(this.handleSE);
+        this.groupElement.appendChild(this.handleSW);
+        this.setupEventListeners();
+    }
+
+    public update(target: IRectangle): Overlay {
+        this.rectElement.setAttribute("x", `${target.x}px`);
+        this.rectElement.setAttribute("y", `${target.y}px`);
+        this.rectElement.setAttribute("width", `${target.width}px`);
+        this.rectElement.setAttribute("height", `${target.height}px`);
+
+        this.handleNW.setAttribute("cx", `${target.x}px`);
+        this.handleNW.setAttribute("cy", `${target.y}px`);
+        this.handleNE.setAttribute("cx", `${target.x+target.width}px`);
+        this.handleNE.setAttribute("cy", `${target.y}px`);
+        this.handleSE.setAttribute("cx", `${target.x+target.width}px`);
+        this.handleSE.setAttribute("cy", `${target.y+target.height}px`);
+        this.handleSW.setAttribute("cx", `${target.x}px`);
+        this.handleSW.setAttribute("cy", `${target.y+target.height}px`);
+        return this;
+    }
+
+    private handleNW: SVGCircleElement;
+    private handleNE: SVGCircleElement;
+    private handleSE: SVGCircleElement;
+    private handleSW: SVGCircleElement;
+
+    private createHandle(): SVGCircleElement {
+        const circle = createSVGElement("circle") as SVGCircleElement;
+        circle.setAttribute("fill", "white");
+        circle.setAttribute("stroke", "#007acc");
+        circle.setAttribute("stroke-width", "1px");
+        circle.setAttribute("r", "5px");
+        return circle;
+    }
+
+    private eventTargetMixin = new EventTargetMixin();
+    protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
+        return this.eventTargetMixin.emitEvent(type, detail);
+    }
+    public on(type: string, handler: TMouseEventHandler): ResizeOverlay {
+        this.eventTargetMixin.on(type, handler);
+        return this;
+    }
+    public off(type: string, handler?: Function): ResizeOverlay {
+        this.eventTargetMixin.off(type, handler);
+        return this;
+    }
+
+    private setupEventListeners(): void {
+        this.handleNW.addEventListener("mousedown", (e: MouseEvent) => {
+            this.emitEvent("mousedown", { targetType: "overlay-handle-nw", domEvent: e });
+        });
+        this.handleNE.addEventListener("mousedown", (e: MouseEvent) => {
+            this.emitEvent("mousedown", { targetType: "overlay-handle-ne", domEvent: e });
+        });
+        this.handleSE.addEventListener("mousedown", (e: MouseEvent) => {
+            this.emitEvent("mousedown", { targetType: "overlay-handle-se", domEvent: e });
+        });
+        this.handleSW.addEventListener("mousedown", (e: MouseEvent) => {
+            this.emitEvent("mousedown", { targetType: "overlay-handle-sw", domEvent: e });
+        });
     }
 }

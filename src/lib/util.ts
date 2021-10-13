@@ -1,6 +1,12 @@
 import chroma from "chroma-js";
 
 
+export function isPointInRectangle(x: number, y: number, rect: IRectangle): boolean {
+    return rect.x <= x && x <= rect.x + rect.width
+        && rect.y <= y && y <= rect.y + rect.height;
+}
+
+
 export function setDifference<T>(S1: Set<T>, S2: Set<T>): Set<T> {
     const D = new Set<T>(S1);
     for (let x of S2) D.delete(x);
