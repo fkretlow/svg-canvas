@@ -61,15 +61,7 @@ export class Overlay {
 export class ResizeOverlay extends Overlay {
     constructor() {
         super();
-        this.handleNW = this.createHandle("nw");
-        this.handleNE = this.createHandle("ne");
-        this.handleSE = this.createHandle("se");
-        this.handleSW = this.createHandle("sw");
-        this.groupElement.appendChild(this.handleNW);
-        this.groupElement.appendChild(this.handleNE);
-        this.groupElement.appendChild(this.handleSE);
-        this.groupElement.appendChild(this.handleSW);
-        this.setupEventListeners();
+        this.createHandles();
     }
 
     public update(target: IRectangle): Overlay {
@@ -78,31 +70,35 @@ export class ResizeOverlay extends Overlay {
         this.rectElement.setAttribute("width", `${target.width}px`);
         this.rectElement.setAttribute("height", `${target.height}px`);
 
-        this.handleNW.setAttribute("cx", `${target.x}px`);
-        this.handleNW.setAttribute("cy", `${target.y}px`);
-        this.handleNE.setAttribute("cx", `${target.x+target.width}px`);
-        this.handleNE.setAttribute("cy", `${target.y}px`);
-        this.handleSE.setAttribute("cx", `${target.x+target.width}px`);
-        this.handleSE.setAttribute("cy", `${target.y+target.height}px`);
-        this.handleSW.setAttribute("cx", `${target.x}px`);
-        this.handleSW.setAttribute("cy", `${target.y+target.height}px`);
+        ResizeOverlay.anchors.forEach(anchor => {
+            const handle = this.handles.get(anchor);
+            const x = isWest(anchor) ? target.x : target.x + target.width;
+            const y = isNorth(anchor) ? target.y : target.y + target.height;
+            handle.setAttribute("cx", `${x}px`);
+            handle.setAttribute("cy", `${y}px`);
+        })
+
         return this;
     }
 
-    private handleNW: SVGCircleElement;
-    private handleNE: SVGCircleElement;
-    private handleSE: SVGCircleElement;
-    private handleSW: SVGCircleElement;
+    static readonly anchors: TOverlayHandleAnchor[] = [ "nw", "ne", "se", "sw" ];
+    private handles = new Map<TOverlayHandleAnchor, SVGCircleElement>();
 
-    private createHandle(anchor: "nw" | "ne" | "se" | "sw"): SVGCircleElement {
-        const circle = createSVGElement("circle") as SVGCircleElement;
-        circle.setAttribute("fill", "white");
-        circle.setAttribute("stroke", "#007acc");
-        circle.setAttribute("stroke-width", "1px");
-        circle.setAttribute("r", "5px");
-        const cursor = anchor === "nw" || anchor === "se" ? "nwse-resize" : "nesw-resize";
-        circle.style.setProperty("cursor", cursor);
-        return circle;
+    private createHandles(): void {
+        ResizeOverlay.anchors.forEach(anchor => {
+            const handle = createSVGElement("circle") as SVGCircleElement;
+            handle.setAttribute("fill", "white");
+            handle.setAttribute("stroke", "#007acc");
+            handle.setAttribute("stroke-width", "1.5px");
+            handle.setAttribute("r", "5px");
+            const cursor = anchor === "nw" || anchor === "se" ? "nwse-resize" : "nesw-resize";
+            handle.style.setProperty("cursor", cursor);
+            handle.addEventListener("mousedown", (e: MouseEvent) => {
+                this.emitEvent("mousedown:resize-handle", { anchor, domEvent: e });
+            });
+            this.groupElement.appendChild(handle);
+            this.handles.set(anchor, handle);
+        });
     }
 
     private eventTargetMixin = new EventTargetMixin();
@@ -117,19 +113,10 @@ export class ResizeOverlay extends Overlay {
         this.eventTargetMixin.off(type, handler);
         return this;
     }
-
-    private setupEventListeners(): void {
-        this.handleNW.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "nw", domEvent: e });
-        });
-        this.handleNE.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "ne", domEvent: e });
-        });
-        this.handleSE.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "se", domEvent: e });
-        });
-        this.handleSW.addEventListener("mousedown", (e: MouseEvent) => {
-            this.emitEvent("mousedown", { targetType: "overlay-handle", anchor: "sw", domEvent: e });
-        });
-    }
 }
+
+
+export function isNorth(anchor: TOverlayHandleAnchor): boolean { return anchor.startsWith("n"); }
+export function isEast(anchor: TOverlayHandleAnchor): boolean { return anchor.endsWith("e"); }
+export function isSouth(anchor: TOverlayHandleAnchor): boolean { return anchor.startsWith("s"); }
+export function isWest(anchor: TOverlayHandleAnchor): boolean { return anchor.endsWith("w"); }

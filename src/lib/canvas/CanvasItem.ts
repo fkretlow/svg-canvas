@@ -8,8 +8,46 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
 
     abstract readonly id: TId;
     abstract readonly element: SVGElement;
+    abstract parentId: TId | null;
+    abstract childIds: Iterable<TId> | null;
 
     protected getItem: TCanvasItemGetter;
+    public getParent(): ICanvasItem | null {
+        return this.parentId ? this.getItem(this.parentId) : null;
+    }
+
+    public *getChildren(): Generator<ICanvasItem> {
+        if (this.childIds) {
+            for (let id of this.childIds) yield this.getItem(id);
+        }
+    }
+
+    public *getDescendants(): Generator<ICanvasItem> {
+        if (this.childIds) {
+            for (let child of this.getChildren()) yield child;
+            for (let child of this.getChildren()) yield* child.getDescendants();
+        }
+    }
+
+    public *getAncestors(): Generator<ICanvasItem> {
+        const parent = this.getParent();
+        if (parent) {
+            yield parent;
+            yield* parent.getAncestors();
+        }
+    }
+
+    public getDepth(): number {
+        let depth = 0;
+        for (let _ of this.getAncestors()) ++depth;
+        return depth;
+    }
+
+    public getHeight(): number {
+        let height = 0;
+        for (let _ of this.getDescendants()) ++height;
+        return height;
+    }
 
     /*
      * Internal Event Handling
@@ -51,7 +89,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
-    moveForwards(): CanvasItem {
+    public moveForwards(): CanvasItem {
         const parent = this.element.parentElement;
         if (parent === null) return this;
 
@@ -62,7 +100,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
-    moveBackwards(): CanvasItem {
+    public moveBackwards(): CanvasItem {
         const parent = this.element.parentElement;
         if (parent === null) return this;
 
@@ -73,7 +111,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
-    moveToTheFront(): CanvasItem {
+    public moveToTheFront(): CanvasItem {
         const parent = this.element.parentElement;
         if (parent === null) return this;
 
@@ -83,7 +121,7 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return this;
     }
 
-    moveToTheBack(): CanvasItem {
+    public moveToTheBack(): CanvasItem {
         const parent = this.element.parentElement;
         if (parent === null) return this;
 

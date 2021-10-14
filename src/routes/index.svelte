@@ -43,7 +43,7 @@
         });
 
         canvas.on("resize", (event: IEvent) => {
-            model.resize(event.detail.id, event.detail.position, event.detail.size);
+            model.resize(event.detail!.id, event.detail!.size);
         });
     });
 </script>

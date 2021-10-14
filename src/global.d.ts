@@ -29,9 +29,6 @@ interface IFontStyle {
     "line-height"?: number;
 }
 
-type TStateKey = string;
-type TStateTransition = (event: IEvent) => TStateKey;
-
 
 type TEventType = string;
 type TEventDetail = any;
@@ -113,8 +110,13 @@ interface ICanvasItem {
 
     readonly element: SVGElement;
 
-    parentId?: TId;
-    childIds?: Iterable<TId>;
+    parentId: TId;
+    childIds: Iterable<TId>;
+    getChildren(): Generator<ICanvasItem>;
+    getDescendants(): Generator<ICanvasItem>;
+    getAncestors(): Generator<ICanvasItem>;
+    getDepth(): number;
+    getHeight(): number;
 
     mount(parent: Element): ICanvasItem;
     unmount(): ICanvasItem;
@@ -127,17 +129,22 @@ interface ICanvasItem {
     select?(): ICanvasItem;
     deselect?(): ICanvasItem;
 
-
     showOverlay?(options?: object): ICanvasItem;
     hideOverlay?(): ICanvasItem;
 
     on(type: TEventType, handler: Function): ICanvasItem;
     off(type: TEventType, handler?: Function): ICanvasItem;
 
+    readonly x?: number;
+    readonly y?: number;
     moveTo?(pos: IPoint): ICanvasItem;
     moveBy?(delta: IPoint): ICanvasItem;
 
+    readonly width?: number;
+    readonly height?: number;
     resize?(delta: IPoint, anchor: string): ICanvasItem;
+
+    readonly name?: string;
     rename?(name: string): ICanvasItem;
 
     moveForwards?(): ICanvasItem;
@@ -145,3 +152,6 @@ interface ICanvasItem {
     moveToTheFront?(): ICanvasItem;
     moveToTheBack?(): ICanvasItem;
 }
+
+
+type TOverlayHandleAnchor = "n" | "e" | "s" | "w" | "nw" | "ne" | "se" | "sw" | "rotate";

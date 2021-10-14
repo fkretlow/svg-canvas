@@ -25,7 +25,7 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     private readonly truth: ICanvasSourceItem;
     public get id(): TId { return this.truth.id; }
     public get parentId(): TId { return this.truth.parentId; }
-
+    public get childIds(): null { return null; }
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -44,11 +44,9 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     private fontStyle: IFontStyle = DEFAULT_FONT_STYLE;
 
     private setupEventListeners(): void {
-        // TODO: Do this properly...
-        const mouseEventTypes = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
-        mouseEventTypes.forEach(type => {
+        [ "mousedown", "click", "dblclick" ].forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type, { targetType: "item", targetId: this.id, domEvent: e });
+                this.emitEvent(type + ":item", { targetId: this.id, domEvent: e });
             });
         });
     }
@@ -98,14 +96,6 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
         this.x += delta.x;
         this.y += delta.y;
         this.textBlock.moveBy(delta);
-        this.overlay.update(this);
-        return this;
-    }
-
-    public resize(size: ISize): CanvasSnippet {
-        this.width = size.width;
-        this.height = size.height;
-        this.textBlock.resize(size);
         this.overlay.update(this);
         return this;
     }

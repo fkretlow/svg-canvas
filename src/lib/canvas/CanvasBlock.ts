@@ -1,5 +1,5 @@
 import { CanvasItem } from "./CanvasItem";
-import { ResizeOverlay } from "./Overlay";
+import { ResizeOverlay, isWest, isNorth, isEast, isSouth } from "./Overlay";
 import { DEFAULT_FONT_STYLE } from "./text";
 import { createSVGElement } from "./../util";
 
@@ -19,7 +19,10 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private readonly truth: ICanvasSourceItem;
 
     public get id(): TId { return this.truth.id; }
-
+    public get parentId(): TId | null {
+        try     { return this.truth.parentId; }
+        catch   { return null; }
+    }
     public get childIds(): Iterable<TId> { return this.truth.childIds; }
     public *getChildren(): Generator<ICanvasItem> {
         for (let id of this.childIds) yield this.getItem(id);
@@ -42,14 +45,13 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private fontStyle: IFontStyle = DEFAULT_FONT_STYLE;
 
     private setupEventListeners(): void {
-        const mouseEventTypes = [ "mousemove", "mousedown", "mouseup", "click", "dblclick" ];
-        mouseEventTypes.forEach(type => {
+        [ "mousedown", "click", "dblclick" ].forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type, { targetType: "item", targetId: this.id, domEvent: e });
+                this.emitEvent(type + ":item", { targetId: this.id, domEvent: e });
             });
         });
 
-        this.overlay.on("mousedown", (e: IEvent) => this.emitEvent(e.type, { targetId: this.id, ...e.detail }));
+        this.overlay.on("mousedown:resize-handle", (e: IEvent) => this.emitEvent(e.type, { targetId: this.id, ...e.detail }));
     }
 
     public update(): CanvasBlock {
@@ -113,7 +115,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     public moveTo(pos: IPoint): CanvasBlock {
         this.x = pos.x;
         this.y = pos.y;
-        for (let child of this.getChildren()) child.moveTo(pos);
         this.overlay.update(this);
         return this;
     }
@@ -121,7 +122,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     public moveBy(delta: IPoint): CanvasBlock {
         this.x += delta.x;
         this.y += delta.y;
-        for (let child of this.getChildren()) child.moveBy(delta);
         this.overlay.update(this);
         return this;
     }
@@ -142,18 +142,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         if (!this._overlayIsShown) return this;
         this._overlayIsShown = false;
         this.containerElement.removeChild(this.overlay.element);
-        return this;
-    }
-
-    public moveToTheFront(): CanvasBlock {
-        const parent = this.element.parentElement;
-        if (parent === null) return this;
-
-        parent.removeChild(this.element);
-        parent.insertAdjacentElement("beforeend", this.element)
-
-        for (let child of this.getChildren()) child.moveToTheFront();
-
         return this;
     }
 
@@ -207,9 +195,3 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.rectElement.style.setProperty("fill", color);
     }
 }
-
-
-function isNorth(anchor: TAnchorKey): boolean { return anchor.startsWith("n"); }
-function isEast(anchor: TAnchorKey): boolean  { return anchor.endsWith("e"); }
-function isSouth(anchor: TAnchorKey): boolean { return anchor.startsWith("s"); }
-function isWest(anchor: TAnchorKey): boolean  { return anchor.endsWith("w"); }

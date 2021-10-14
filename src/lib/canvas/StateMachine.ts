@@ -1,38 +1,30 @@
-export abstract class StateMachine<TStateKey=string, TTransitionData=any> {
-    public transition(data: TTransitionData): void {
-        if (!this.state)
-            throw new Error(`StateMachine.transition: not in a defined state`);
-
-        const key = this.state.transition(data);
-        this.setState(key, data);
+export class StateMachine<TContext> {
+    constructor(context: TContext, initialState: State) {
+        this.state = initialState;
+        this.context = context;
     }
+    private state: State;
+    private context: TContext;
 
-    public registerState(state: IState<TStateKey, TTransitionData>) { this.states.set(state.key, state); }
-    public unregisterState(key: TStateKey) { this.states.delete(key); }
-
-    private state: IState<TStateKey, TTransitionData> | null = null;
-    public setState(key: TStateKey, data?: TTransitionData) {
-        if (key !== this.state?.key) {
-            this.state.teardown?.(data);
-            this.state = this.getState(key);
-            this.state.initialize?.(data);
+    public send(event: IEvent) {
+        const newState = this.state.transition(event);
+        if (!Object.is(newState, this.state)) {
+            this.state.onExit(event);
+            newState.setContext(this.context);
+            newState.onEnter(event);
+            this.state = newState;
         }
     }
-
-    private states = new Map<TStateKey, IState<TStateKey, TTransitionData>>();
-    private getState(key: TStateKey): IState<TStateKey, TTransitionData> {
-        const state = this.states.get(key);
-        if (!state)
-            throw new Error(`StateMachine.getState: no state found for key '${key}'`);
-        return state;
-    }
-
 }
 
 
-export interface IState<TStateKey, TTransitionData=any> {
-    readonly key: TStateKey;
-    transition(data: TTransitionData): TStateKey;
-    initialize?: (data: TTransitionData) => void;
-    teardown?: (data: TTransitionData) => void;
+export abstract class State {
+    abstract transition(event: IEvent): State;
+    onEnter(event: IEvent): void {}
+    onExit(event: IEvent): void {}
+
+    protected context: any;
+    setContext(context: any): void {
+        this.context = context;
+    }
 }
