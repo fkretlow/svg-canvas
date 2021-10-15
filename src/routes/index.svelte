@@ -20,16 +20,16 @@
             styles: {
                 width: "100%",
                 height: "100%",
-                "background-color": "#edc",
+                /* "background-color": "#edc", */
                 "border": "1px solid rgba(0,0,0,.2)",
             }
         });
         bus.registerListener(canvas);
 
-        canvas.setTruth(model.rectangles);
+        canvas.setTruth(model);
 
         canvas.on("add", (event: IEvent) => {
-            model.add({ type: event.detail.type, ...event.detail.position });
+            model.addItem({ type: event.detail.type, ...event.detail.position });
         });
 
         canvas.on("drop", (event: IEvent) => {

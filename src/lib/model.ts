@@ -5,53 +5,70 @@ import {isPointInRectangle} from "./util";
 
 
 export class Model implements IEventSource {
-    public rectangles = new Array<Snippet | Block>();
-    public elementMap = new Map<TId, Snippet | Block>();
+    constructor() {
+        this.addLane({ y: 0, height: 500 });
+        this.addLane({ y: 500, height: 500 });
+        this.addItem({ type: "snippet", laneId: this.lanes[0].id, x: 50, y: 60 });
+    }
 
-    public add(data: {
+    public readonly lanes = new Array<Lane>();
+    public elements = new Map<TId, Snippet | Block | Lane>();
+
+    public addItem(data: {
         type: "snippet" | "block",
         id?: TId,
+        laneId: TId,
         x: number,
         y: number,
+        width?: number,
+        height?: number,
     }) {
+        let item: Snippet | Block;
         if (data.type === "snippet") {
-            const snippet = new Snippet(data);
-            this.elementMap.set(snippet.id, snippet);
-            this.rectangles.push(snippet);
-            this.dispatchEvent?.("item-added", { id: snippet.id });
+            item = new Snippet(data as any);
         } else if (data.type === "block") {
-            const block = new Block(data);
-            this.elementMap.set(block.id, block);
-            this.rectangles.push(block);
-            this.dispatchEvent?.("item-added", { id: block.id });
+            item = new Block(data as any);
         }
+        this.elements.set(item.id, item);
+        this.insertIntoContainer(item.id, data.laneId);
+        this.dispatchEvent?.("item-added", { id: item.id });
+    }
+
+    public addLane(data: {
+        id?: TId,
+        y: number,
+        height?: number,
+        color?: string,
+    }) {
+        const lane = new Lane(data);
+        this.elements.set(lane.id, lane);
+        this.lanes.push(lane);
+        this.lanes.sort((l1,l2) => l1.y - l2.y);
     }
 
     public insertIntoContainer(childId: TId, containerId: TId) {
-        const child = this.elementMap.get(childId) as Snippet;
-        const container = this.elementMap.get(containerId) as Block;
+        const child = this.elements.get(childId) as Snippet;
+        const container = this.elements.get(containerId) as Block | Lane;
         child.parentId = containerId;
         container.childIds.push(childId);
     }
 
     public extractFromContainer(childId: TId) {
-        const child = this.elementMap.get(childId) as Snippet;
+        const child = this.elements.get(childId) as Snippet;
         if (!child.parentId) return;
-        const container = this.elementMap.get(child.parentId) as Block;
+        const container = this.elements.get(child.parentId) as Block | Lane;
         container.childIds = container.childIds.filter(id => id !== childId);
         child.parentId = null;
     }
 
     public delete(id: TId): boolean {
-        const i = this.rectangles.findIndex(r => r.id === id);
-        if (i === -1) return false;
-        this.rectangles.splice(i, 1);
-        this.elementMap.delete(id);
+        const rv = this.elements.delete(id);
         this.dispatchEvent?.("item-deleted", { id });
+        return rv;
     }
 
     public move(id: TId, to: IPoint): boolean {
-        const rect = this.elementMap.get(id);
+        const rect = this.elements.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, to);
         this.dispatchEvent?.("item-moved", { id, to });
@@ -66,7 +83,7 @@ export class Model implements IEventSource {
     }
 
     public resize(id: TId, size: IRectangle): boolean {
-        const rect = this.elementMap.get(id);
+        const rect = this.elements.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, size);
         this.dispatchEvent?.("item-resized", { id });
@@ -74,7 +91,7 @@ export class Model implements IEventSource {
     }
 
     public changeColor(id: TId, color?: string): boolean {
-        const rect = this.elementMap.get(id);
+        const rect = this.elements.get(id);
         if (rect === undefined) return false;
         color = color || chroma.random().hex();
         rect.color = color;
@@ -83,7 +100,7 @@ export class Model implements IEventSource {
     }
 
     private getBlockAt(pos: IPoint): TId | null {
-        for (let item of this.rectangles.values()) {
+        for (let item of this.elements.values()) {
             if (item instanceof Block && isPointInRectangle(pos.x, pos.y, item)) return item.id;
         }
         return null;
@@ -150,4 +167,28 @@ export class Block implements IRectangle {
     width = 200;
     height = 150;
     color = "lightgray"
+}
+
+
+export class Lane {
+    readonly type = "lane";
+
+    constructor(data: {
+        id?: TId,
+        y: number,
+        height?: number,
+        name?: string,
+    }) {
+        this.y = data.y;
+        if (data.id) this.id = data.id;
+        if (data.height) this.height = data.height;
+        if (data.name) this.name = data.name;
+    }
+
+    id = uuid();
+    childIds: TId[] = [];
+    name: string = "Lane";
+    y: number;
+    height: number = 500;
+    color = "gray";
 }

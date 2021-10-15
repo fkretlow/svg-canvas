@@ -1,7 +1,7 @@
 import { CanvasItem } from "./CanvasItem";
 import { ResizeOverlay, isWest, isNorth, isEast, isSouth } from "./Overlay";
-import { DEFAULT_FONT_STYLE } from "./text";
 import { createSVGElement } from "./../util";
+
 
 export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
@@ -24,9 +24,8 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         catch   { return null; }
     }
     public get childIds(): Iterable<TId> { return this.truth.childIds; }
-    public *getChildren(): Generator<ICanvasItem> {
-        for (let id of this.childIds) yield this.getItem(id);
-    }
+
+    public getLane(): ICanvasItem { return this.getRoot(); }
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -41,8 +40,6 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         rect.style.setProperty("stroke", "rgba(0,0,0,.3)");
         return rect;
     }
-
-    private fontStyle: IFontStyle = DEFAULT_FONT_STYLE;
 
     private setupEventListeners(): void {
         [ "mousedown", "click", "dblclick" ].forEach(type => {
@@ -62,6 +59,7 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this.color = this.truth.color;
         this.name = this.truth.name;
         this.overlay.update(this);
+        for (let child of this.getChildren()) child.update();
         return this;
     }
 
@@ -160,28 +158,24 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
         this._name = name;
     }
 
-    private _x: number = 0;
     public get x(): number { return this._x; }
     private set x(x: number) {
         this._x = x
         this.rectElement.setAttribute("x", `${x}px`);
     }
 
-    private _y: number = 0;
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y
         this.rectElement.setAttribute("y", `${y}px`);
     }
 
-    private _width: number = 0;
     public get width(): number { return this._width; }
     private set width(width: number) {
         this._width = width
         this.rectElement.setAttribute("width", `${width}px`);
     }
 
-    private _height: number = 0;
     public get height(): number { return this._height; }
     private set height(height: number) {
         this._height = height

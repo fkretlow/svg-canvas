@@ -75,8 +75,14 @@ interface IEventHandlerRecord {
 
 type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
 
+interface ICanvasTruth {
+    elements: Map<TId, ICanvasSourceItem>;
+    lanes: Iterable<ICanvasSourceItem>;
+}
+
+
 interface ICanvas {
-    setTruth(data: Iterable<ICanvasSourceItem>): ICanvas;
+    setTruth(data: ICanvasTruth): ICanvas;
     mount(parent: Element): ICanvas;
     unmount(): ICanvas;
     update(ids: Iterable<TId>): ICanvas;
@@ -117,6 +123,9 @@ interface ICanvasItem {
     getAncestors(): Generator<ICanvasItem>;
     getDepth(): number;
     getHeight(): number;
+    getRoot(): ICanvasItem;
+
+    getPanOffset?(): IPoint;
 
     mount(parent: Element): ICanvasItem;
     unmount(): ICanvasItem;

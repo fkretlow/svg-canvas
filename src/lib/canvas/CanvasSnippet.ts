@@ -27,6 +27,8 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     public get parentId(): TId { return this.truth.parentId; }
     public get childIds(): null { return null; }
 
+    public getLane(): ICanvasItem { return this.getRoot(); }
+
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
         g.style.setProperty("contain", "paint");
@@ -131,28 +133,24 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
         this._name = name;
     }
 
-    private _x: number = 0;
     public get x(): number { return this._x; }
     private set x(x: number) {
         this._x = x
         this.rectElement.setAttribute("x", `${x}px`);
     }
 
-    private _y: number = 0;
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y
         this.rectElement.setAttribute("y", `${y}px`);
     }
 
-    private _width: number = 0;
     public get width(): number { return this._width; }
     private set width(width: number) {
         this._width = width
         this.rectElement.setAttribute("width", `${width}px`);
     }
 
-    private _height: number = 0;
     public get height(): number { return this._height; }
     private set height(height: number) {
         this._height = height

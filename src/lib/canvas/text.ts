@@ -134,6 +134,7 @@ export class TextBlock {
             const line = this.lines[i];
             const text = createSVGElement("text");
             text.textContent = line;
+            text.setAttribute("fill", "black");
             text.setAttribute("x", `${this.x}px`);
             text.setAttribute("y", `${this.y + ascent}px`);
             text.setAttribute("dy", `${i * this.style["line-height"]}px`);

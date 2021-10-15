@@ -1,21 +1,22 @@
 import { EventTargetMixin } from "./../events";
 import { CanvasSnippet } from "./CanvasSnippet";
 import { CanvasBlock } from "./CanvasBlock";
+import { CanvasLane } from "./CanvasLane";
 import { CanvasRoot } from "./CanvasRoot";
-import { isPointInRectangle } from "./../util";
 import { StateMachine, State } from "./StateMachine";
+
 
 
 export class Canvas implements ICanvas, IEventListener {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
+        this.setupGlobalEventHandlers();
         this.root = new CanvasRoot((id: TId) => this.getItem(id));
-        this.setupRootEventHandlers(this.root);
         this.registerItem(this.root);
         if (options) this.setOptions(options);
         if (parent) this.mount(parent);
     }
 
-    truth: Iterable<ICanvasSourceItem> | null = null;
+    truth: ICanvasTruth | null = null;
     readonly root: CanvasRoot;
     readonly options: ICanvasOptions = {};
 
@@ -96,28 +97,21 @@ export class Canvas implements ICanvas, IEventListener {
     /*
      * Connection to the model.
      */
-    public setTruth(data: Iterable<ICanvasSourceItem>): Canvas {
-        this.truth = data;
+    public setTruth(truth: ICanvasTruth): Canvas {
+        this.truth = truth;
+        this.update();
         return this;
     }
 
-    private processTruth(): Map<TId, ICanvasSourceItem> {
-        const truth = new Map<TId, ICanvasSourceItem>();
-        for (let part of this.truth) truth.set(part.id, part);
-        return truth;
-    }
-
     public update(): Canvas {
-        const truthIds = this.processTruth();
-
         // add new items
-        for (let part of truthIds.values()) {
+        for (let part of this.truth.elements.values()) {
             if (!this.items.has(part.id)) this.addItem(part);
         }
 
         // remove deleted
         for (let item of this.items.values()) {
-            if (!truthIds.has(item.id) && !Object.is(item, this.root)) {
+            if (!this.truth.elements.has(item.id) && !Object.is(item, this.root)) {
                 this.deleteItem(item.id);
             }
         }
@@ -132,15 +126,24 @@ export class Canvas implements ICanvas, IEventListener {
 
     public addItem(source: ICanvasSourceItem): Canvas {
         let item: ICanvasItem;
-        if (source.hasOwnProperty("childIds")) {
+        if (source.type === "block") {
             item = new CanvasBlock(id => this.getItem(id), source);
-        } else {
+        } else if (source.type === "snippet") {
             item = new CanvasSnippet(id => this.getItem(id), source);
+        } else if (source.type === "lane") {
+            item = new CanvasLane(id => this.getItem(id), source);
         }
 
         this.registerItem(item);
-        this.root.mountChild(item.id);
-        this.setupItemEventHandlers(item);
+
+        if (item instanceof CanvasLane) {
+            this.connectLaneEventHandlers(item);
+            this.root.mountChild(item.id);
+        } else {
+            this.connectItemEventHandlers(item);
+            const lane = (<any>item).getLane();
+            lane.mountChild(item.id);
+        }
 
         return this;
     }
@@ -172,16 +175,22 @@ export class Canvas implements ICanvas, IEventListener {
         return this;
     }
 
-    private setupItemEventHandlers(item: ICanvasItem): void {
+    private connectItemEventHandlers(item: ICanvasItem): void {
         item.on("mousedown:item", (e: IEvent) => this.machine.send(e));
         item.on("mousedown:resize-handle", (e: IEvent) => this.machine.send(e));
     }
 
-    private setupRootEventHandlers(root: CanvasRoot): void {
-        root.on("mousedown:canvas", (e: IEvent) => this.machine.send(e));
-        root.on("dblclick:canvas", (e: IEvent) => this.machine.send(e));
-        root.on("mousemove", (e: IEvent) => this.machine.send(e));
-        root.on("mouseup", (e: IEvent) => this.machine.send(e));
+    private connectLaneEventHandlers(lane: CanvasLane): void {
+        lane.on("mousedown:lane", (e: IEvent) => this.machine.send(e));
+        lane.on("dblclick:lane", (e: IEvent) => this.machine.send(e));
+        lane.on("mousemove", (e: IEvent) => this.machine.send(e));
+        lane.on("mouseup", (e: IEvent) => this.machine.send(e));
+    }
+
+    private setupGlobalEventHandlers(): void {
+        window.addEventListener("keyup", (e: KeyboardEvent) => {
+            if (e.key === "Escape") this.machine.send({ type: "escape" });
+        });
     }
 
     /*
@@ -206,11 +215,11 @@ class ReadyState extends CanvasState {
         switch (e.type) {
             case "mousedown:item":
                 return new MousedownOnItemState();
-            case "mousedown:canvas":
+            case "mousedown:lane":
                 return new MousedownOnCanvasState();
             case "mousedown:resize-handle":
                 return new ResizeItemState();
-            case "dblclick:canvas":
+            case "dblclick:lane":
                 this.addItem(e);
                 return this;
             default:
@@ -219,10 +228,14 @@ class ReadyState extends CanvasState {
     }
 
     private addItem(e: IEvent): CanvasState {
-        const isBlock = e.detail!.domEvent.altKey;
+        console.log("ReadyState.addItem: event", e);
+        const isBlock = e.detail.domEvent.altKey;
+        const x = e.detail.domEvent.offsetX;
+        const y = e.detail.domEvent.offsetY;
+        const laneId = e.detail.targetId;
         this.canvas.emitEvent("add", {
             type: isBlock ? "block" : "snippet",
-            position: { x: e.detail!.domEvent.offsetX, y: e.detail!.domEvent.offsetY },
+            position: { x, y, laneId },
         });
         return this;
     }

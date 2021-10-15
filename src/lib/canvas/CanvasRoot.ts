@@ -34,8 +34,8 @@ export class CanvasRoot extends CanvasItem {
     }
 
     mountChild(id: TId): CanvasRoot {
-        const item = this.getItem(id);
-        this.element.appendChild(item.element);
+        const child = this.getItem(id);
+        this.element.appendChild(child.element);
         return this;
     }
 

@@ -49,6 +49,18 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         return height;
     }
 
+    public getRoot(): ICanvasItem {
+        const parent = this.getParent();
+        return parent ? parent.getRoot() : this;
+    }
+
+    public getPanOffset(): IPoint {
+        const parent = this.getParent() as any;
+        if (!parent)
+            throw new Error(`CanvasItem.panOffset: no parent`);
+        return parent.getPanOffset();
+    }
+
     /*
      * Internal Event Handling
      */
@@ -86,6 +98,43 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         for (let [ property, value ] of Object.entries(styles)) {
             this.element.style.setProperty(property, value);
         }
+        return this;
+    }
+
+    /*
+     * Positioning
+     * Override setters and move methods if necessary to adjust SVG element positions.
+     */
+
+    protected _x: number = 0;
+    public get x(): number { return this._x; }
+    protected set x(x: number) { this._x = x }
+
+    protected _y: number = 0;
+    public get y(): number { return this._y; }
+    protected set y(y: number) { this._y = y }
+
+    protected _width: number = 0;
+    public get width(): number { return this._width; }
+    protected set width(width: number) {
+        this._width = width
+    }
+
+    protected _height: number = 0;
+    public get height(): number { return this._height; }
+    protected set height(height: number) {
+        this._height = height
+    }
+
+    public moveTo(pos: IPoint): CanvasItem {
+        this.x = pos.x;
+        this.y = pos.y;
+        return this;
+    }
+
+    public moveBy(delta: IPoint): CanvasItem {
+        this.x += delta.x;
+        this.y += delta.y;
         return this;
     }
 
