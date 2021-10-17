@@ -7,7 +7,6 @@ export class CanvasRoot extends CanvasItem {
     constructor(getItem: TCanvasItemGetter) {
         super(getItem);
         this.element = this.createSVGElement();
-        this.setupEventListeners();
     }
 
     readonly id: TId = uuid();
@@ -48,7 +47,13 @@ export class CanvasRoot extends CanvasItem {
     private createSVGElement(): SVGElement {
         const element = createSVGElement("svg") as SVGElement;
         element.setAttribute("draggable", "false");
-        element.style.setProperty("contain", "paint");
+
+        [ "mouseup", "mousemove" ].forEach(type => {
+            element.addEventListener(type, (e: MouseEvent) => {
+                this.emitEvent(type, { domEvent: e });
+            });
+        });
+
         return element;
     }
 
@@ -57,18 +62,5 @@ export class CanvasRoot extends CanvasItem {
             this.element.style.setProperty(property, value);
         }
         return this;
-    }
-
-    private setupEventListeners(): void {
-        [ "mousedown", "dblclick" ].forEach(type => {
-            this.element.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type + ":canvas", { targetId: this.id, domEvent: e });
-            });
-        });
-        [ "mousemove", "mouseup" ].forEach(type => {
-            this.element.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type, { targetId: this.id, domEvent: e });
-            });
-        });
     }
 }

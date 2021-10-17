@@ -1,5 +1,6 @@
 import { CanvasItem } from "./CanvasItem";
 import { createSVGElement } from "./../util";
+import { transformWindowToSVGCoordinates } from "./../util";
 
 
 export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget {
@@ -7,15 +8,18 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
         super(getItem);
         this.truth = truth;
 
-        this.element = this.createSVGElement();
+        this.svg = this.createSVGElement();
         this.rectElement = this.createRectElement();
-        this.element.appendChild(this.rectElement);
+        this.svg.appendChild(this.rectElement);
+        this.refPoint = this.svg.createSVGPoint();
         this.setupEventListeners();
     }
 
     private readonly truth: ICanvasSourceItem;
-    public readonly element: SVGElement;
+    public get element(): SVGElement { return this.svg; }
+    public readonly svg: SVGSVGElement;
     public readonly rectElement: SVGRectElement;
+    protected readonly refPoint: SVGPoint;
 
     private _panOffset: IPoint = { x: 0, y: 0 };
     public get panOffset(): IPoint { return this._panOffset; }
@@ -26,10 +30,9 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
 
     public get childIds(): Iterable<TId> { return this.truth.childIds; }
 
-    private createSVGElement(): SVGElement {
-        const svg = createSVGElement("svg");
-        svg.setAttribute("x", "0px");
-        svg.style.setProperty("width", "100%");
+    private createSVGElement(): SVGSVGElement {
+        const svg = createSVGElement("svg") as SVGSVGElement;
+        svg.setAttribute("x", "0");
         return svg;
     }
 
@@ -45,21 +48,10 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
 
     private setupEventListeners(): void {
         [ "mousedown", "dblclick" ].forEach(type => {
-            this.element.addEventListener(type, (e: MouseEvent) => {
-                const x = e.offsetX;
-                const y = e.offsetY;
+            this.rectElement.addEventListener(type, (e: MouseEvent) => {
+                const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e, false);
                 this.emitEvent(type + ":lane", { targetId: this.id, position: { x, y }, domEvent: e});
             });
-        });
-        this.element.addEventListener("mousemove", (e: MouseEvent) => {
-            const x = e.movementX;
-            const y = e.movementY;
-            this.emitEvent("mousemove", { targetId: this.id, delta: { x, y }, domEvent: e });
-        });
-        this.element.addEventListener("mouseup", (e: MouseEvent) => {
-            const x = e.offsetX;
-            const y = e.offsetY;
-            this.emitEvent("mouseup", { targetId: this.id, position: { x, y }, domEvent: e });
         });
     }
 
@@ -80,7 +72,7 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
 
     public mountChild(id: TId): CanvasLane {
         const child = this.getItem(id);
-        this.element.appendChild(child.element);
+        this.svg.appendChild(child.element);
         return this;
     }
 
@@ -117,19 +109,19 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y
-        this.element.setAttribute("y", `${y}px`);
+        this.svg.setAttribute("y", `${y}px`);
     }
 
     public get height(): number { return this._height; }
     private set height(height: number) {
         this._height = height
-        this.element.setAttribute("height", `${height}px`);
+        this.svg.setAttribute("height", `${height}px`);
     }
 
     private _color: string = "gray";
     public get color(): string { return this._color; }
     private set color(color: string) {
         this._color = color
-        this.element.setAttribute("fill", color);
+        this.svg.setAttribute("fill", color);
     }
 }

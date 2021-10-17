@@ -20,8 +20,6 @@
             styles: {
                 width: "100%",
                 height: "100%",
-                /* "background-color": "#edc", */
-                "border": "1px solid rgba(0,0,0,.2)",
             }
         });
         bus.registerListener(canvas);

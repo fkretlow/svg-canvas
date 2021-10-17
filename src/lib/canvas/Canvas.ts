@@ -11,6 +11,7 @@ export class Canvas implements ICanvas, IEventListener {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
         this.setupGlobalEventHandlers();
         this.root = new CanvasRoot((id: TId) => this.getItem(id));
+        this.connectRootEventHandlers(this.root);
         this.registerItem(this.root);
         if (options) this.setOptions(options);
         if (parent) this.mount(parent);
@@ -183,8 +184,11 @@ export class Canvas implements ICanvas, IEventListener {
     private connectLaneEventHandlers(lane: CanvasLane): void {
         lane.on("mousedown:lane", (e: IEvent) => this.machine.send(e));
         lane.on("dblclick:lane", (e: IEvent) => this.machine.send(e));
-        lane.on("mousemove", (e: IEvent) => this.machine.send(e));
-        lane.on("mouseup", (e: IEvent) => this.machine.send(e));
+    }
+
+    private connectRootEventHandlers(root: CanvasRoot): void {
+        root.on("mouseup", (e: IEvent) => this.machine.send(e));
+        root.on("mousemove", (e: IEvent) => this.machine.send(e));
     }
 
     private setupGlobalEventHandlers(): void {
@@ -230,8 +234,7 @@ class ReadyState extends CanvasState {
     private addItem(e: IEvent): CanvasState {
         console.log("ReadyState.addItem: event", e);
         const isBlock = e.detail.domEvent.altKey;
-        const x = e.detail.domEvent.offsetX;
-        const y = e.detail.domEvent.offsetY;
+        const { x, y } = e.detail.position;
         const laneId = e.detail.targetId;
         this.canvas.emitEvent("add", {
             type: isBlock ? "block" : "snippet",

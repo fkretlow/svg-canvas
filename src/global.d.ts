@@ -76,8 +76,8 @@ interface IEventHandlerRecord {
 type TCanvasItemGetter = ((id: TId) => ICanvasItem | null);
 
 interface ICanvasTruth {
-    elements: Map<TId, ICanvasSourceItem>;
-    lanes: Iterable<ICanvasSourceItem>;
+    elements: Map<TId, any>;
+    lanes: Iterable<any>;
 }
 
 

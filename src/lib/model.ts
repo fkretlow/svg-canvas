@@ -8,7 +8,7 @@ export class Model implements IEventSource {
     constructor() {
         this.addLane({ y: 0, height: 500 });
         this.addLane({ y: 500, height: 500 });
-        this.addItem({ type: "snippet", laneId: this.lanes[0].id, x: 50, y: 60 });
+        this.addItem({ type: "snippet", laneId: this.lanes[1].id, x: 50, y: 60 });
     }
 
     public readonly lanes = new Array<Lane>();

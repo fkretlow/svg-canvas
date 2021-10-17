@@ -105,3 +105,22 @@ export function getPreviousElementInArray<T>(
         return null;
     }
 }
+
+
+/**
+ * Given an SVG element nested somewhere inside an SVG image and a mouse event, transform the
+ * client coordinates of the event to coordinates relative to the nearest parent <svg> (or the SVG
+ * root element).
+ */
+export function transformWindowToSVGCoordinates(element: SVGElement, event: MouseEvent, root: boolean = false): SVGPoint {
+    let node: SVGElement = element;
+    while (node.parentElement && node.parentElement instanceof SVGElement) {
+        if (node instanceof SVGSVGElement && !root) break;
+        node = node.parentElement;
+    }
+    const refPoint = (<SVGSVGElement>node).createSVGPoint();
+    refPoint.x = event.clientX;
+    refPoint.y = event.clientY;
+    const result = refPoint.matrixTransform(element.getScreenCTM().inverse());
+    return result;
+}

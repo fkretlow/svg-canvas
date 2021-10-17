@@ -1,5 +1,5 @@
 import { CanvasItem } from "./CanvasItem";
-import { createSVGElement } from "./../util";
+import { createSVGElement, transformWindowToSVGCoordinates } from "./../util";
 import { Overlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE, TextBlock } from "./text";
 
@@ -48,9 +48,14 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     private setupEventListeners(): void {
         [ "mousedown", "click", "dblclick" ].forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type + ":item", { targetId: this.id, domEvent: e });
+                const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e);
+                this.emitEvent(type + ":item", { targetId: this.id, position: { x, y }, domEvent: e });
             });
         });
+        // this.rectElement.addEventListener("mouseup", (e: MouseEvent) => {
+        //     const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e);
+        //     this.emitEvent("mouseup", { targetId: this.id, position: { x, y }, domEvent: e });
+        // });
     }
 
     public update(): CanvasSnippet {
