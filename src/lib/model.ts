@@ -8,30 +8,42 @@ export class Model implements IEventSource {
     constructor() {
         this.addLane({ y: 0, height: 500 });
         this.addLane({ y: 500, height: 500 });
-        this.addItem({ type: "snippet", laneId: this.lanes[1].id, x: 50, y: 60 });
+        this.addItem({ type: "snippet", x: 50, y: 60 });
     }
 
     public readonly lanes = new Array<Lane>();
-    public elements = new Map<TId, Snippet | Block | Lane>();
+    public elements = new Map<TId, Snippet | Block>();
 
     public addItem(data: {
         type: "snippet" | "block",
         id?: TId,
-        laneId: TId,
+        laneId?: TId,
         x: number,
         y: number,
         width?: number,
         height?: number,
     }) {
         let item: Snippet | Block;
+        if (data.laneId === undefined) {
+            if (this.lanes.length === 0)
+                throw new Error(`Model.addItem: there's no lane`);
+            data.laneId = this.lanes[0].id;
+        }
         if (data.type === "snippet") {
             item = new Snippet(data as any);
         } else if (data.type === "block") {
             item = new Block(data as any);
         }
         this.elements.set(item.id, item);
-        this.insertIntoContainer(item.id, data.laneId);
+        this.insertIntoLane(item.id, item.laneId);
         this.dispatchEvent?.("item-added", { id: item.id });
+    }
+
+    public getLane(id: TId): Lane | null {
+        for (let lane of this.lanes) {
+            if (lane.id === id) return lane;
+        }
+        return null;
     }
 
     public addLane(data: {
@@ -41,14 +53,30 @@ export class Model implements IEventSource {
         color?: string,
     }) {
         const lane = new Lane(data);
-        this.elements.set(lane.id, lane);
         this.lanes.push(lane);
         this.lanes.sort((l1,l2) => l1.y - l2.y);
     }
 
+    public insertIntoLane(childId: TId, laneId: TId) {
+        const item = this.elements.get(childId) as Snippet | Block;
+        const lane = this.getLane(laneId);
+        item.laneId = laneId;
+        lane.itemIds.push(childId);
+    }
+
+    public extractFromLane(childId: TId) {
+        const item = this.elements.get(childId) as Snippet | Block;
+        if (item.laneId === null) return;
+        const lane = this.getLane(item.laneId);
+        lane.itemIds = lane.itemIds.filter(id => id !== childId);
+        item.laneId = null;
+    }
+
     public insertIntoContainer(childId: TId, containerId: TId) {
         const child = this.elements.get(childId) as Snippet;
-        const container = this.elements.get(containerId) as Block | Lane;
+        const container = this.elements.get(containerId) as Block;
+        if (!(container instanceof Block))
+            throw new Error(`Model.insertIntoContainer: not a Block`);
         child.parentId = containerId;
         container.childIds.push(childId);
     }
@@ -56,7 +84,7 @@ export class Model implements IEventSource {
     public extractFromContainer(childId: TId) {
         const child = this.elements.get(childId) as Snippet;
         if (!child.parentId) return;
-        const container = this.elements.get(child.parentId) as Block | Lane;
+        const container = this.elements.get(child.parentId) as Block;
         container.childIds = container.childIds.filter(id => id !== childId);
         child.parentId = null;
     }
@@ -67,7 +95,7 @@ export class Model implements IEventSource {
         return rv;
     }
 
-    public move(id: TId, to: IPoint): boolean {
+    public move(id: TId, laneId: TId, to: IPoint): boolean {
         const rect = this.elements.get(id);
         if (rect === undefined) return false;
         Object.assign(rect, to);
@@ -78,6 +106,9 @@ export class Model implements IEventSource {
             const blockId = this.getBlockAt(to);
             if (blockId) this.insertIntoContainer(id, blockId);
         }
+
+        this.extractFromLane(id);
+        this.insertIntoLane(id, laneId);
 
         return true;
     }
@@ -120,19 +151,22 @@ export class Snippet implements IRectangle {
     readonly type = "snippet";
 
     constructor(data: {
-        x: number, y: number,
         id?: TId,
+        laneId?: TId,
+        x: number, y: number,
         name?: string,
         color?: string,
     }) {
         this.x = data.x;
         this.y = data.y;
         if (data.id) this.id = data.id;
+        if (data.laneId) this.laneId = data.laneId;
         if (data.name) this.name = data.name;
         if (data.color) this.color = data.color;
     }
 
     id = uuid();
+    laneId: TId | null;
     parentId: TId | null = null;
     name: string = "Snippet";
     x: number;
@@ -147,19 +181,22 @@ export class Block implements IRectangle {
     readonly type = "block";
 
     constructor(data: {
-        x: number, y: number,
         id?: TId,
+        laneId?: TId,
+        x: number, y: number,
         name?: string,
         color?: string,
     }) {
         this.x = data.x;
         this.y = data.y;
         if (data.id) this.id = data.id;
+        if (data.laneId) this.laneId = data.laneId;
         if (data.name) this.name = data.name;
         if (data.color) this.color = data.color;
     }
 
     id = uuid();
+    laneId: TId | null = null;
     childIds: TId[] = [];
     name: string = "Block";
     x: number;
@@ -186,7 +223,7 @@ export class Lane {
     }
 
     id = uuid();
-    childIds: TId[] = [];
+    itemIds: TId[] = [];
     name: string = "Lane";
     y: number;
     height: number = 500;

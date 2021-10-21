@@ -1,9 +1,10 @@
 import { v4 as uuid } from "uuid";
 import { CanvasItem } from "./CanvasItem";
-import { createSVGElement } from "./../util";
+import { EventTargetMixin } from "./../events";
+import { createSVGElement, transformWindowToSVGCoordinates } from "./../util";
 
 
-export class CanvasRoot extends CanvasItem {
+export class CanvasRoot extends CanvasItem implements IEventTarget {
     constructor(getItem: TCanvasItemGetter) {
         super(getItem);
         this.element = this.createSVGElement();
@@ -32,6 +33,11 @@ export class CanvasRoot extends CanvasItem {
         return this;
     }
 
+    mountLane(lane: ICanvasItem): CanvasRoot {
+        this.element.appendChild(lane.element);
+        return this;
+    }
+
     mountChild(id: TId): CanvasRoot {
         const child = this.getItem(id);
         this.element.appendChild(child.element);
@@ -48,9 +54,21 @@ export class CanvasRoot extends CanvasItem {
         const element = createSVGElement("svg") as SVGElement;
         element.setAttribute("draggable", "false");
 
-        [ "mouseup", "mousemove" ].forEach(type => {
+        [ "mouseup", "mousemove", "mousedown", "click", "dblclick" ].forEach(type => {
             element.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type, { domEvent: e });
+                if (e["canvasEventDetail"] === undefined) e["canvasEventDetail"] = {
+                    eventType: type,
+                };
+                Object.assign(e["canvasEventDetail"], {
+                    canvasCoordinates: transformWindowToSVGCoordinates(this.element as SVGElement, e, false),
+                    clientCoordinates: { x: e.clientX, y: e.clientY },
+                    movement: { x: e.movementX, y: e.movementY },
+                    shiftKey: e.shiftKey,
+                    altKey: e.altKey,
+                    ctrlKey: e.ctrlKey,
+                    button: e.button,
+                });
+                this.emitEvent(e["canvasEventDetail"]["eventType"], e["canvasEventDetail"]);
             });
         });
 
@@ -63,4 +81,21 @@ export class CanvasRoot extends CanvasItem {
         }
         return this;
     }
+
+    /*
+     * Internal Event Handling
+     */
+    protected eventTargetMixin = new EventTargetMixin();
+    protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
+        return this.eventTargetMixin.emitEvent(type, detail);
+    }
+    public on(type: string, handler: TMouseEventHandler): CanvasItem {
+        this.eventTargetMixin.on(type, handler);
+        return this;
+    }
+    public off(type: string, handler?: Function): CanvasItem {
+        this.eventTargetMixin.off(type, handler);
+        return this;
+    }
+
 }

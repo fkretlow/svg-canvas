@@ -3,7 +3,7 @@ import { ResizeOverlay, isWest, isNorth, isEast, isSouth } from "./Overlay";
 import { createSVGElement } from "./../util";
 
 
-export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget {
+export class CanvasBlock extends CanvasItem {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem);
         this.truth = truth;
@@ -19,13 +19,18 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private readonly truth: ICanvasSourceItem;
 
     public get id(): TId { return this.truth.id; }
+
+    public get laneId(): TId | null {
+        try     { return this.truth.laneId; }
+        catch   { return null; }
+    }
+
     public get parentId(): TId | null {
         try     { return this.truth.parentId; }
         catch   { return null; }
     }
-    public get childIds(): Iterable<TId> { return this.truth.childIds; }
 
-    public getLane(): ICanvasItem { return this.getRoot(); }
+    public get childIds(): Iterable<TId> { return this.truth.childIds; }
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -44,11 +49,22 @@ export class CanvasBlock extends CanvasItem implements ICanvasItem, IEventTarget
     private setupEventListeners(): void {
         [ "mousedown", "click", "dblclick" ].forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                this.emitEvent(type + ":item", { targetId: this.id, domEvent: e });
+                if (e["canvasEventDetail"] === undefined) e["canvasEventDetail"] = {};
+                Object.assign(e["canvasEventDetail"], {
+                    eventType: type + ":item",
+                    targetType: "block",
+                    targetId: this.id,
+                });
             });
         });
 
-        this.overlay.on("mousedown:resize-handle", (e: IEvent) => this.emitEvent(e.type, { targetId: this.id, ...e.detail }));
+        this.containerElement.addEventListener("mousedown", (e: MouseEvent) => {
+            if (e["canvasEventDetail"] === undefined)
+                throw new Error(`CanvasBlock: received event ${e.type} without canvasEventDetail`);
+            Object.assign(e["canvasEventDetail"], {
+                targetId: this.id,
+            });
+        });
     }
 
     public update(): CanvasBlock {

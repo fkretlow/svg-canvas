@@ -93,8 +93,8 @@ export class EventTargetMixin implements IEventTargetMixin {
     }
 
     public async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
-        const handlers = this.eventHandlers.get(type);
-        handlers?.forEach(handler => handler({ type, detail }));
+        this.eventHandlers.get("*")?.forEach(handler => handler({ type, detail }));
+        this.eventHandlers.get(type)?.forEach(handler => handler({ type, detail }));
     }
 
     public on(type: string, handler: Function): void {

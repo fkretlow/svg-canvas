@@ -13,6 +13,12 @@ export function setDifference<T>(S1: Set<T>, S2: Set<T>): Set<T> {
     return D;
 }
 
+export function setUnion<T>(S1: Set<T>, S2: Set<T>): Set<T> {
+    const U = new Set<T>(S1);
+    for (let x of S2) U.add(x);
+    return U;
+}
+
 
 export function wait(ms: number): Promise<void> {
     return new Promise(fn => {

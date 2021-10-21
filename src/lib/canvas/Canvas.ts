@@ -46,6 +46,21 @@ export class Canvas implements ICanvas, IEventListener {
     private unregisterItem(id: TId): boolean { return this.items.delete(id); }
 
     /*
+     * Lanes
+     */
+    private lanes = new Array<CanvasLane>();
+
+    /*
+     * Panning
+     */
+    public panOffset: IPoint = { x: 0, y: 0 };
+    public panBy(movement: IPoint): Canvas {
+        this.panOffset.x += movement.x;
+        this.panOffset.y += movement.y;
+        return this;
+    }
+
+    /*
      * Selection
      */
     public readonly selection = new Set<TId>();
@@ -105,6 +120,11 @@ export class Canvas implements ICanvas, IEventListener {
     }
 
     public update(): Canvas {
+        // add new lanes
+        for (let trueLane of this.truth.lanes) {
+            if (this.getLane(trueLane.id) === null) this.addLane(trueLane);
+        }
+
         // add new items
         for (let part of this.truth.elements.values()) {
             if (!this.items.has(part.id)) this.addItem(part);
@@ -125,8 +145,31 @@ export class Canvas implements ICanvas, IEventListener {
         return this;
     }
 
+    public addLane(source: ICanvasSourceItem): Canvas {
+        const lane = new CanvasLane(id => this.getItem(id), source);
+        this.lanes.push(lane);
+        this.lanes.sort((l1,l2) => l1.y - l2.y);
+        this.root.mountLane(lane);
+        return this;
+    }
+
+    public getLane(id: TId): CanvasLane | null {
+        for (let lane of this.lanes) {
+            if (id === lane.id) return lane;
+        }
+        return null;
+    }
+
+    public getLaneAt(pt: IPoint): CanvasLane | null {
+        for (let lane of this.lanes) {
+            if (lane.y <= pt.y && pt.y <= lane.y + lane.height) return lane;
+        }
+        return null;
+    }
+
     public addItem(source: ICanvasSourceItem): Canvas {
         let item: ICanvasItem;
+
         if (source.type === "block") {
             item = new CanvasBlock(id => this.getItem(id), source);
         } else if (source.type === "snippet") {
@@ -136,15 +179,8 @@ export class Canvas implements ICanvas, IEventListener {
         }
 
         this.registerItem(item);
-
-        if (item instanceof CanvasLane) {
-            this.connectLaneEventHandlers(item);
-            this.root.mountChild(item.id);
-        } else {
-            this.connectItemEventHandlers(item);
-            const lane = (<any>item).getLane();
-            lane.mountChild(item.id);
-        }
+        const lane = this.getLane(item.laneId);
+        lane.mountChild(item.id);
 
         return this;
     }
@@ -157,6 +193,22 @@ export class Canvas implements ICanvas, IEventListener {
         item.destroy();
         this.emitEvent("delete", { id });
         return this;
+    }
+
+    public transformLaneToCanvasCoordinates(laneId: TId, laneCoordinates: IPoint): IPoint {
+        const lane = this.getLane(laneId);
+        return {
+            x: laneCoordinates.x,
+            y: laneCoordinates.y + lane.y,
+        }
+    }
+
+    public transformCanvasToLaneCoordinates(laneId: TId, canvasCoordinates: IPoint): IPoint {
+        const lane = this.getLane(laneId);
+        return {
+            x: canvasCoordinates.x,
+            y: canvasCoordinates.y - lane.y,
+        };
     }
 
     public setOptions(options: Partial<ICanvasOptions>): Canvas {
@@ -176,19 +228,10 @@ export class Canvas implements ICanvas, IEventListener {
         return this;
     }
 
-    private connectItemEventHandlers(item: ICanvasItem): void {
-        item.on("mousedown:item", (e: IEvent) => this.machine.send(e));
-        item.on("mousedown:resize-handle", (e: IEvent) => this.machine.send(e));
-    }
-
-    private connectLaneEventHandlers(lane: CanvasLane): void {
-        lane.on("mousedown:lane", (e: IEvent) => this.machine.send(e));
-        lane.on("dblclick:lane", (e: IEvent) => this.machine.send(e));
-    }
-
     private connectRootEventHandlers(root: CanvasRoot): void {
-        root.on("mouseup", (e: IEvent) => this.machine.send(e));
-        root.on("mousemove", (e: IEvent) => this.machine.send(e));
+        root.on("*", (e: IEvent) => {
+            this.machine.send(e);
+        });
     }
 
     private setupGlobalEventHandlers(): void {
@@ -233,12 +276,12 @@ class ReadyState extends CanvasState {
 
     private addItem(e: IEvent): CanvasState {
         console.log("ReadyState.addItem: event", e);
-        const isBlock = e.detail.domEvent.altKey;
-        const { x, y } = e.detail.position;
-        const laneId = e.detail.targetId;
+        const isBlock = e.detail.altKey;
         this.canvas.emitEvent("add", {
             type: isBlock ? "block" : "snippet",
-            position: { x, y, laneId },
+            canvasCoordinates: e.detail.canvasCoordinates,
+            laneCoordinates: e.detail.laneCoordinates,
+            laneId: e.detail.laneId,
         });
         return this;
     }
@@ -262,9 +305,9 @@ class MousedownOnItemState extends CanvasState {
     }
 
     onEnter(e: IEvent) {
-        this.targetId = e.detail!.targetId;
+        this.targetId = e.detail.targetId;
         this.wasSelected = this.canvas.selection.has(this.targetId);
-        this.shiftKey = e.detail!.domEvent.shiftKey;
+        this.shiftKey = e.detail.shiftKey;
         this.canvas.select(this.targetId, true);
     }
 
@@ -297,7 +340,7 @@ class MousedownOnCanvasState extends CanvasState {
     }
 
     onEnter(e: IEvent): void {
-        if (!e.detail!.domEvent.shiftKey) this.canvas.clearSelection();
+        if (!e.detail.shiftKey) this.canvas.clearSelection();
     }
 }
 
@@ -320,12 +363,17 @@ class DragItemState extends CanvasState {
 
     onEnter(): void {
         for (let selected of this.canvas.getSelectedItems()) {
-            selected.moveToTheFront();
             this.items.add(selected);
             for (let descendant of selected.getDescendants()) {
-                descendant.moveToTheFront();
                 this.items.add(descendant);
             }
+        }
+
+        for (let item of this.items as Set<any>) {
+            item.unmount();
+            const canvasCoordinates = this.canvas.transformLaneToCanvasCoordinates(item.laneId, { x: item.x, y: item.y });
+            item.moveTo(canvasCoordinates);
+            this.canvas.root.mountChild(item.id);
         }
     }
 
@@ -336,22 +384,31 @@ class DragItemState extends CanvasState {
         /*
          * We can simply update all items because we haven't committed any model interaction.
          */
-        if (abort) {
-            this.items.forEach(item => item.update());
-        }
+        if (abort) this.items.forEach(item => item.update());
 
         else {
-            const items: { id: TId, position: IPoint }[] = [];
-            this.items.forEach(item => {
-                items.push({ id: item.id, position: { x: item.x, y: item.y } });
-            })
+            const items: { id: TId, laneId: TId, laneCoordinates: IPoint }[] = [];
+
+            for (let item of this.items as Set<any>) {
+                item.unmount();
+                const lane = this.canvas.getLaneAt({ x: item.x, y: item.y });
+                lane.mountChild(item.id);
+                const laneCoordinates = this.canvas.transformCanvasToLaneCoordinates(lane.id, { x: item.x, y: item.y });
+                item.moveTo(laneCoordinates);
+
+                items.push({
+                    id: item.id,
+                    laneId: lane.id,
+                    laneCoordinates,
+                });
+            }
+
             this.canvas.emitEvent("drop", { items });
         }
     }
 
     moveTargets(e: IEvent): void {
-        const delta = { x: e.detail!.domEvent.movementX, y: e.detail!.domEvent.movementY };
-        this.items.forEach(item => item.moveBy?.(delta));
+        this.items.forEach(item => item.moveBy?.(e.detail.movement));
     }
 }
 
@@ -404,11 +461,7 @@ class ResizeItemState extends CanvasState {
     }
 
     private resizeTarget(e: IEvent) {
-        const delta = {
-            x: e.detail!.domEvent.movementX,
-            y: e.detail!.domEvent.movementY,
-        };
-        this.target.resize(delta, this.anchor);
+        this.target.resize(e.detail.movement, this.anchor);
         this.hasResized = true;
         return this;
     }

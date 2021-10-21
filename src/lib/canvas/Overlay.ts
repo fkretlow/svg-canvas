@@ -93,11 +93,15 @@ export class ResizeOverlay extends Overlay {
             handle.setAttribute("r", "5px");
             const cursor = anchor === "nw" || anchor === "se" ? "nwse-resize" : "nesw-resize";
             handle.style.setProperty("cursor", cursor);
-            handle.addEventListener("mousedown", (e: MouseEvent) => {
-                this.emitEvent("mousedown:resize-handle", { anchor, domEvent: e });
-            });
             this.groupElement.appendChild(handle);
             this.handles.set(anchor, handle);
+
+            handle.addEventListener("mousedown", (e: MouseEvent) => {
+                e["canvasEventDetail"] = {
+                    eventType: "mousedown:resize-handle",
+                    anchor,
+                };
+            });
         });
     }
 

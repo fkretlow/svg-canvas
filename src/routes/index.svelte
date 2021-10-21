@@ -27,12 +27,18 @@
         canvas.setTruth(model);
 
         canvas.on("add", (event: IEvent) => {
-            model.addItem({ type: event.detail.type, ...event.detail.position });
+            const data = {
+                type: event.detail.type,
+                laneId: event.detail.laneId,
+                x: event.detail.laneCoordinates.x,
+                y: event.detail.laneCoordinates.y,
+            };
+            model.addItem(data);
         });
 
         canvas.on("drop", (event: IEvent) => {
-            event.detail.items.forEach(({ id, position }) => {
-                model.move(id, position);
+            event.detail.items.forEach(({ id, laneCoordinates, laneId }) => {
+                model.move(id, laneId, laneCoordinates);
             })
         });
 

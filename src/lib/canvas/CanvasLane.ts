@@ -3,7 +3,7 @@ import { createSVGElement } from "./../util";
 import { transformWindowToSVGCoordinates } from "./../util";
 
 
-export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget {
+export class CanvasLane extends CanvasItem {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem);
         this.truth = truth;
@@ -11,19 +11,20 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
         this.svg = this.createSVGElement();
         this.rectElement = this.createRectElement();
         this.svg.appendChild(this.rectElement);
-        this.refPoint = this.svg.createSVGPoint();
         this.setupEventListeners();
+        this.update();
     }
 
     private readonly truth: ICanvasSourceItem;
     public get element(): SVGElement { return this.svg; }
     public readonly svg: SVGSVGElement;
     public readonly rectElement: SVGRectElement;
-    protected readonly refPoint: SVGPoint;
 
-    private _panOffset: IPoint = { x: 0, y: 0 };
-    public get panOffset(): IPoint { return this._panOffset; }
-    private set panOffset(offset: IPoint) { this._panOffset = offset; }
+    public panOffset: IPoint = { x: 0, y: 0 };
+    public panVerticallyBy(y: number): CanvasLane {
+        this.panOffset.y += y;
+        return this;
+    }
 
     public get id(): TId { return this.truth.id; }
     public readonly parentId = null;
@@ -47,10 +48,16 @@ export class CanvasLane extends CanvasItem implements ICanvasItem, IEventTarget 
     }
 
     private setupEventListeners(): void {
-        [ "mousedown", "dblclick" ].forEach(type => {
-            this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e, false);
-                this.emitEvent(type + ":lane", { targetId: this.id, position: { x, y }, domEvent: e});
+        [ "mousedown", "click", "dblclick" ].forEach(type => {
+            this.svg.addEventListener(type, (e: MouseEvent) => {
+                if (e["canvasEventDetail"] === undefined) e["canvasEventDetail"] = {
+                    eventType: type + ":lane",
+                    targetId: this.id,
+                };
+                Object.assign(e["canvasEventDetail"], {
+                    laneId: this.id,
+                    laneCoordinates: transformWindowToSVGCoordinates(this.rectElement, e, false),
+                });
             });
         });
     }

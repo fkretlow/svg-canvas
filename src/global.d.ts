@@ -101,6 +101,7 @@ interface ICanvasSourceItem {
     height: number;
     color: string;
     name?: string;
+    laneId?: TId | null;
     parentId?: TId | null;
     childIds?: Iterable<TId> | null;
 }
@@ -116,6 +117,7 @@ interface ICanvasItem {
 
     readonly element: SVGElement;
 
+    laneId?: TId;
     parentId: TId;
     childIds: Iterable<TId>;
     getChildren(): Generator<ICanvasItem>;
@@ -140,9 +142,6 @@ interface ICanvasItem {
 
     showOverlay?(options?: object): ICanvasItem;
     hideOverlay?(): ICanvasItem;
-
-    on(type: TEventType, handler: Function): ICanvasItem;
-    off(type: TEventType, handler?: Function): ICanvasItem;
 
     readonly x?: number;
     readonly y?: number;

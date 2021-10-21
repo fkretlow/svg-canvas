@@ -1,7 +1,7 @@
 import { EventTargetMixin } from "./../events";
 
 
-export abstract class CanvasItem implements ICanvasItem, IEventTarget {
+export abstract class CanvasItem implements ICanvasItem {
     constructor(getItem: TCanvasItemGetter) {
         this.getItem = getItem;
     }
@@ -59,22 +59,6 @@ export abstract class CanvasItem implements ICanvasItem, IEventTarget {
         if (!parent)
             throw new Error(`CanvasItem.panOffset: no parent`);
         return parent.getPanOffset();
-    }
-
-    /*
-     * Internal Event Handling
-     */
-    protected eventTargetMixin = new EventTargetMixin();
-    protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
-        return this.eventTargetMixin.emitEvent(type, detail);
-    }
-    public on(type: string, handler: TMouseEventHandler): CanvasItem {
-        this.eventTargetMixin.on(type, handler);
-        return this;
-    }
-    public off(type: string, handler?: Function): CanvasItem {
-        this.eventTargetMixin.off(type, handler);
-        return this;
     }
 
     public destroy(): void {

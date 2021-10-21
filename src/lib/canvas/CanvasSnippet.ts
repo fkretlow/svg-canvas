@@ -4,7 +4,7 @@ import { Overlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE, TextBlock } from "./text";
 
 
-export class CanvasSnippet extends CanvasItem implements IEventTarget {
+export class CanvasSnippet extends CanvasItem {
     constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
         super(getItem);
         this.truth = truth;
@@ -24,10 +24,15 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
 
     private readonly truth: ICanvasSourceItem;
     public get id(): TId { return this.truth.id; }
-    public get parentId(): TId { return this.truth.parentId; }
-    public get childIds(): null { return null; }
 
-    public getLane(): ICanvasItem { return this.getRoot(); }
+    public get laneId(): TId | null {
+        try     { return this.truth.laneId; }
+        catch   { return null; }
+    }
+
+    public get parentId(): TId { return this.truth.parentId; }
+
+    public get childIds(): null { return null; }
 
     private createContainerElement(): SVGGElement {
         const g = createSVGElement("g") as SVGGElement;
@@ -48,14 +53,14 @@ export class CanvasSnippet extends CanvasItem implements IEventTarget {
     private setupEventListeners(): void {
         [ "mousedown", "click", "dblclick" ].forEach(type => {
             this.rectElement.addEventListener(type, (e: MouseEvent) => {
-                const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e);
-                this.emitEvent(type + ":item", { targetId: this.id, position: { x, y }, domEvent: e });
+                if (e["canvasEventDetail"] === undefined) e["canvasEventDetail"] = {};
+                Object.assign(e["canvasEventDetail"], {
+                    eventType: type + ":item",
+                    targetType: "snippet",
+                    targetId: this.id,
+                });
             });
         });
-        // this.rectElement.addEventListener("mouseup", (e: MouseEvent) => {
-        //     const { x, y } = transformWindowToSVGCoordinates(this.rectElement, e);
-        //     this.emitEvent("mouseup", { targetId: this.id, position: { x, y }, domEvent: e });
-        // });
     }
 
     public update(): CanvasSnippet {
