@@ -71,8 +71,8 @@ export class TextBlock {
     }
 
     public update(text: string, shape: IRectangle) {
-        this.x = shape.x + 5;
-        this.y = shape.y + 5;
+        this.x = shape.x;
+        this.y = shape.y;
         this.width = shape.width;
         this.height = shape.height;
         this.text = text;
@@ -98,7 +98,7 @@ export class TextBlock {
         return this;
     }
 
-    public editText(text: string): TextBlock {
+    public setText(text: string): TextBlock {
         this.text = text;
         return this;
     }
@@ -135,8 +135,8 @@ export class TextBlock {
             const text = createSVGElement("text");
             text.textContent = line;
             text.setAttribute("fill", "black");
-            text.setAttribute("x", `${this.x}px`);
-            text.setAttribute("y", `${this.y + ascent}px`);
+            text.setAttribute("x", `${this.x + this.padding.left}px`);
+            text.setAttribute("y", `${this.y + ascent + this.padding.top}px`);
             text.setAttribute("dy", `${i * this.style["line-height"]}px`);
             this.containerElement.appendChild(text);
         }
@@ -166,7 +166,7 @@ export class TextBlock {
         this._x = x;
         for (let i = 0; i < this.containerElement.children.length; ++i) {
             const text = this.containerElement.children[i];
-            text.setAttribute("x", `${x}px`);
+            text.setAttribute("x", `${x + this.padding.left}px`);
         }
     }
 
@@ -178,7 +178,7 @@ export class TextBlock {
         const ascent = measureText(this.lines[0], this.style).actualBoundingBoxAscent;
         for (let i = 0; i < this.containerElement.children.length; ++i) {
             const text = this.containerElement.children[i];
-            text.setAttribute("y", `${y + ascent}px`);
+            text.setAttribute("y", `${y + ascent + this.padding.top}px`);
         }
     }
 
@@ -193,5 +193,17 @@ export class TextBlock {
     public get height(): number { return this._height; }
     private set height(height: number) {
         this._height = height;
+    }
+
+    private padding: {
+        top: number,
+        right: number,
+        bottom: number,
+        left: number,
+    } = {
+        top: 5,
+        right: 5,
+        bottom: 5,
+        left: 5,
     }
 }

@@ -113,12 +113,12 @@ export class CanvasBlock extends CanvasItem {
 
     public select(): CanvasBlock {
         this.selected = true;
-        this.showOverlay();
+        this.highlight(2);
         return this;
     }
     public deselect(): CanvasBlock {
         this.selected = false;
-        this.hideOverlay();
+        this.highlight(0);
         return this;
     }
 
@@ -145,17 +145,31 @@ export class CanvasBlock extends CanvasItem {
         return this;
     }
 
+    public highlight(level: number = 1): CanvasBlock {
+        if (level <= 0) {
+            this.hideOverlay();
+        } else if (level === 1) {
+            this.showOverlay({
+                strokeWidth: 1,
+                showHandles: false,
+            });
+        } else {
+            this.showOverlay({
+                strokeWidth: 2,
+                showHandles: true,
+            });
+        }
+        return this;
+    }
+
     public showOverlay(options?: object): CanvasBlock {
-        if (this._overlayIsShown) return this;
-        this._overlayIsShown = true;
-        this.containerElement.insertAdjacentElement("beforeend", this.overlay.element);
+        if (options) this.overlay.setOptions(options);
+        this.overlay.mount(this.containerElement);
         return this;
     }
 
     public hideOverlay(): CanvasBlock {
-        if (!this._overlayIsShown) return this;
-        this._overlayIsShown = false;
-        this.containerElement.removeChild(this.overlay.element);
+        this.overlay.unmount();
         return this;
     }
 
@@ -166,7 +180,6 @@ export class CanvasBlock extends CanvasItem {
     private readonly containerElement: SVGGElement;
     private readonly rectElement: SVGRectElement;
     private overlay: ResizeOverlay;
-    private _overlayIsShown = false;
 
     private _name: string = "";
     public get name(): string { return this._name; }

@@ -1,6 +1,3 @@
-import { EventTargetMixin } from "./../events";
-
-
 export abstract class CanvasItem implements ICanvasItem {
     constructor(getItem: TCanvasItemGetter) {
         this.getItem = getItem;
@@ -52,13 +49,6 @@ export abstract class CanvasItem implements ICanvasItem {
     public getRoot(): ICanvasItem {
         const parent = this.getParent();
         return parent ? parent.getRoot() : this;
-    }
-
-    public getPanOffset(): IPoint {
-        const parent = this.getParent() as any;
-        if (!parent)
-            throw new Error(`CanvasItem.panOffset: no parent`);
-        return parent.getPanOffset();
     }
 
     public destroy(): void {

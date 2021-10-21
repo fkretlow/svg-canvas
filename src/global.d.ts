@@ -16,8 +16,8 @@ interface ISize {
 }
 
 interface IRectangle extends IPoint, ISize {
-    name: string;
-    color: string;
+    name?: string;
+    color?: string;
 }
 
 interface IFontStyle {
@@ -140,16 +140,18 @@ interface ICanvasItem {
     select?(): ICanvasItem;
     deselect?(): ICanvasItem;
 
+    highlight?(level?: number): ICanvasItem;
+
     showOverlay?(options?: object): ICanvasItem;
     hideOverlay?(): ICanvasItem;
 
-    readonly x?: number;
-    readonly y?: number;
+    readonly x: number;
+    readonly y: number;
     moveTo?(pos: IPoint): ICanvasItem;
     moveBy?(delta: IPoint): ICanvasItem;
 
-    readonly width?: number;
-    readonly height?: number;
+    readonly width: number;
+    readonly height: number;
     resize?(delta: IPoint, anchor: string): ICanvasItem;
 
     readonly name?: string;
@@ -162,4 +164,12 @@ interface ICanvasItem {
 }
 
 
-type TOverlayHandleAnchor = "n" | "e" | "s" | "w" | "nw" | "ne" | "se" | "sw" | "rotate";
+type TCanvasOverlayHandleAnchor = "n" | "e" | "s" | "w" | "nw" | "ne" | "se" | "sw" | "rotate";
+
+interface ICanvasOverlayOptions {
+    stroke: string;
+    fill: string;
+    fillOpacity: number;
+    showHandles: boolean;
+    strokeWidth: number;
+}

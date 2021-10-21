@@ -11,6 +11,8 @@ export class CanvasLane extends CanvasItem {
         this.svg = this.createSVGElement();
         this.rectElement = this.createRectElement();
         this.svg.appendChild(this.rectElement);
+        this.itemGroupElement = this.createItemGroupElement();
+        this.svg.appendChild(this.itemGroupElement);
         this.setupEventListeners();
         this.update();
     }
@@ -19,12 +21,7 @@ export class CanvasLane extends CanvasItem {
     public get element(): SVGElement { return this.svg; }
     public readonly svg: SVGSVGElement;
     public readonly rectElement: SVGRectElement;
-
-    public panOffset: IPoint = { x: 0, y: 0 };
-    public panVerticallyBy(y: number): CanvasLane {
-        this.panOffset.y += y;
-        return this;
-    }
+    public readonly itemGroupElement: SVGGElement;
 
     public get id(): TId { return this.truth.id; }
     public readonly parentId = null;
@@ -35,6 +32,11 @@ export class CanvasLane extends CanvasItem {
         const svg = createSVGElement("svg") as SVGSVGElement;
         svg.setAttribute("x", "0");
         return svg;
+    }
+
+    private createItemGroupElement(): SVGGElement {
+        const g = createSVGElement("g") as SVGGElement;
+        return g;
     }
 
     private createRectElement(): SVGRectElement {
@@ -54,9 +56,13 @@ export class CanvasLane extends CanvasItem {
                     eventType: type + ":lane",
                     targetId: this.id,
                 };
+                const laneCoordinates = transformWindowToSVGCoordinates(this.rectElement, e, false);
+                laneCoordinates.x -= this.panOffset.x;
+                laneCoordinates.y -= this.panOffset.y;
+
                 Object.assign(e["canvasEventDetail"], {
                     laneId: this.id,
-                    laneCoordinates: transformWindowToSVGCoordinates(this.rectElement, e, false),
+                    laneCoordinates,
                 });
             });
         });
@@ -79,7 +85,7 @@ export class CanvasLane extends CanvasItem {
 
     public mountChild(id: TId): CanvasLane {
         const child = this.getItem(id);
-        this.svg.appendChild(child.element);
+        this.itemGroupElement.appendChild(child.element);
         return this;
     }
 
@@ -89,6 +95,14 @@ export class CanvasLane extends CanvasItem {
     }
     public deselect(): CanvasLane {
         this.selected = false;
+        return this;
+    }
+
+    public panBy(movement: IPoint): CanvasLane {
+        this.panOffset = {
+            x: this.panOffset.x + movement.x,
+            y: this.panOffset.y + movement.y,
+        }
         return this;
     }
 
@@ -130,5 +144,12 @@ export class CanvasLane extends CanvasItem {
     private set color(color: string) {
         this._color = color
         this.svg.setAttribute("fill", color);
+    }
+
+    private _panOffset: IPoint = { x: 0, y: 0 };
+    public get panOffset(): IPoint { return this._panOffset; }
+    public set panOffset(offset: IPoint) {
+        this._panOffset = offset;
+        this.itemGroupElement.setAttribute("transform", `translate(${this.panOffset.x} ${this.panOffset.y})`);
     }
 }

@@ -83,12 +83,12 @@ export class CanvasSnippet extends CanvasItem {
 
     public select(): CanvasSnippet {
         this.selected = true;
-        this.showOverlay();
+        this.highlight(2);
         return this;
     }
     public deselect(): CanvasSnippet {
         this.selected = false;
-        this.hideOverlay();
+        this.highlight(0);
         return this;
     }
 
@@ -114,11 +114,29 @@ export class CanvasSnippet extends CanvasItem {
 
     public rename(name: string): CanvasSnippet {
         this.name = name;
-        this.textBlock.editText(name);
+        this.textBlock.setText(name);
         return this;
     }
 
-    public showOverlay(): CanvasSnippet {
+    public highlight(level: number = 1): CanvasSnippet {
+        if (level <= 0) {
+            this.hideOverlay();
+        } else if (level === 1) {
+            this.showOverlay({
+                strokeWidth: 1,
+                showHandles: false,
+            });
+        } else {
+            this.showOverlay({
+                strokeWidth: 2,
+                showHandles: true,
+            });
+        }
+        return this;
+    }
+
+    public showOverlay(options?: Partial<ICanvasOverlayOptions>): CanvasSnippet {
+        if (options) this.overlay.setOptions(options);
         this.overlay.mount(this.containerElement);
         return this;
     }

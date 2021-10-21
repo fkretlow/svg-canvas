@@ -2,18 +2,29 @@ import { v4 as uuid } from "uuid";
 import { CanvasItem } from "./CanvasItem";
 import { EventTargetMixin } from "./../events";
 import { createSVGElement, transformWindowToSVGCoordinates } from "./../util";
+import { MarqueeOverlay } from "./Overlay";
 
 
 export class CanvasRoot extends CanvasItem implements IEventTarget {
     constructor(getItem: TCanvasItemGetter) {
         super(getItem);
         this.element = this.createSVGElement();
+        this.laneGroupElement = this.createLaneGroupElement();
+        this.element.appendChild(this.laneGroupElement);
+        this.itemGroupElement = this.createItemGroupElement();
+        this.element.appendChild(this.itemGroupElement);
+        this.overlayGroupElement = this.createOverlayGroupElement();
+        this.element.appendChild(this.overlayGroupElement);
     }
 
     readonly id: TId = uuid();
     readonly parentId = null;
     readonly childIds = null;
     readonly element: SVGElement;
+    readonly itemGroupElement: SVGGElement;
+    readonly laneGroupElement: SVGGElement;
+    readonly overlayGroupElement: SVGGElement;
+    readonly marquee = new MarqueeOverlay();
     protected readonly getItem: TCanvasItemGetter;
 
     destroy() {}
@@ -34,19 +45,41 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
     }
 
     mountLane(lane: ICanvasItem): CanvasRoot {
-        this.element.appendChild(lane.element);
+        this.laneGroupElement.appendChild(lane.element);
         return this;
     }
 
     mountChild(id: TId): CanvasRoot {
         const child = this.getItem(id);
-        this.element.appendChild(child.element);
+        this.itemGroupElement.appendChild(child.element);
         return this;
     }
 
     unmountChild(id: TId): CanvasRoot {
         const item = this.getItem(id);
-        this.element.removeChild(item.element);
+        this.itemGroupElement.removeChild(item.element);
+        return this;
+    }
+
+    public showMarquee(): CanvasRoot {
+        this.marquee.mount(this.overlayGroupElement);
+        return this;
+    }
+
+    public hideMarquee(): CanvasRoot {
+        this.marquee.resetVector();
+        this.marquee.unmount();
+        return this;
+    }
+
+    public setMarqueeOrigin(origin: IPoint): CanvasRoot {
+        this.marquee.resetVector();
+        this.marquee.setOrigin(origin);
+        return this;
+    }
+
+    public resizeMarqueeBy(delta: IPoint): CanvasRoot {
+        this.marquee.moveVectorBy(delta);
         return this;
     }
 
@@ -60,7 +93,7 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
                     eventType: type,
                 };
                 Object.assign(e["canvasEventDetail"], {
-                    canvasCoordinates: transformWindowToSVGCoordinates(this.element as SVGElement, e, false),
+                    canvasCoordinates: transformWindowToSVGCoordinates(this.element, e, false),
                     clientCoordinates: { x: e.clientX, y: e.clientY },
                     movement: { x: e.movementX, y: e.movementY },
                     shiftKey: e.shiftKey,
@@ -73,6 +106,21 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
         });
 
         return element;
+    }
+
+    private createLaneGroupElement(): SVGGElement {
+        const g = createSVGElement("g") as SVGGElement;
+        return g;
+    }
+
+    private createItemGroupElement(): SVGGElement {
+        const g = createSVGElement("g") as SVGGElement;
+        return g;
+    }
+
+    private createOverlayGroupElement(): SVGGElement {
+        const g = createSVGElement("g") as SVGGElement;
+        return g;
     }
 
     public css(styles: TCSSStylesCollection): CanvasRoot {
@@ -97,5 +145,4 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
         this.eventTargetMixin.off(type, handler);
         return this;
     }
-
 }

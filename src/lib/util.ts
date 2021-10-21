@@ -6,6 +6,10 @@ export function isPointInRectangle(x: number, y: number, rect: IRectangle): bool
         && rect.y <= y && y <= rect.y + rect.height;
 }
 
+export function isRectangleInRectangle(child: IRectangle, container: IRectangle): boolean {
+    return isPointInRectangle(child.x, child.y, container)
+    && isPointInRectangle(child.x + child.width, child.y + child.height, container);
+}
 
 export function setDifference<T>(S1: Set<T>, S2: Set<T>): Set<T> {
     const D = new Set<T>(S1);

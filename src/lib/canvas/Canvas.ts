@@ -4,6 +4,7 @@ import { CanvasBlock } from "./CanvasBlock";
 import { CanvasLane } from "./CanvasLane";
 import { CanvasRoot } from "./CanvasRoot";
 import { StateMachine, State } from "./StateMachine";
+import {isRectangleInRectangle} from "$lib/util";
 
 
 
@@ -40,7 +41,7 @@ export class Canvas implements ICanvas, IEventListener {
     /*
      * Item registry
      */
-    private readonly items = new Map<TId, ICanvasItem>();
+    public readonly items = new Map<TId, ICanvasItem>();
     public getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
     private registerItem(item: ICanvasItem): void { this.items.set(item.id, item); }
     private unregisterItem(id: TId): boolean { return this.items.delete(id); }
@@ -48,17 +49,7 @@ export class Canvas implements ICanvas, IEventListener {
     /*
      * Lanes
      */
-    private lanes = new Array<CanvasLane>();
-
-    /*
-     * Panning
-     */
-    public panOffset: IPoint = { x: 0, y: 0 };
-    public panBy(movement: IPoint): Canvas {
-        this.panOffset.x += movement.x;
-        this.panOffset.y += movement.y;
-        return this;
-    }
+    public lanes = new Array<CanvasLane>();
 
     /*
      * Selection
@@ -198,16 +189,16 @@ export class Canvas implements ICanvas, IEventListener {
     public transformLaneToCanvasCoordinates(laneId: TId, laneCoordinates: IPoint): IPoint {
         const lane = this.getLane(laneId);
         return {
-            x: laneCoordinates.x,
-            y: laneCoordinates.y + lane.y,
+            x: laneCoordinates.x + lane.panOffset.x,
+            y: laneCoordinates.y + lane.y + lane.panOffset.y,
         }
     }
 
     public transformCanvasToLaneCoordinates(laneId: TId, canvasCoordinates: IPoint): IPoint {
         const lane = this.getLane(laneId);
         return {
-            x: canvasCoordinates.x,
-            y: canvasCoordinates.y - lane.y,
+            x: canvasCoordinates.x - lane.panOffset.x,
+            y: canvasCoordinates.y - lane.y - lane.panOffset.y,
         };
     }
 
@@ -230,6 +221,7 @@ export class Canvas implements ICanvas, IEventListener {
 
     private connectRootEventHandlers(root: CanvasRoot): void {
         root.on("*", (e: IEvent) => {
+            e.detail.spaceKey = this.spaceKey;
             this.machine.send(e);
         });
     }
@@ -238,7 +230,15 @@ export class Canvas implements ICanvas, IEventListener {
         window.addEventListener("keyup", (e: KeyboardEvent) => {
             if (e.key === "Escape") this.machine.send({ type: "escape" });
         });
+        window.addEventListener("keydown", (e: KeyboardEvent) => {
+            if (e.key === " " && !e.repeat) this.machine.send({ type: "spacedown" })
+        });
+        window.addEventListener("keyup", (e: KeyboardEvent) => {
+            if (e.key === " ") this.machine.send({ type: "spaceup" });
+        });
     }
+
+    private spaceKey: boolean = false;
 
     /*
      * State machine
@@ -263,12 +263,14 @@ class ReadyState extends CanvasState {
             case "mousedown:item":
                 return new MousedownOnItemState();
             case "mousedown:lane":
-                return new MousedownOnCanvasState();
+                return new MousedownOnLaneState();
             case "mousedown:resize-handle":
                 return new ResizeItemState();
             case "dblclick:lane":
                 this.addItem(e);
                 return this;
+            case "spacedown":
+                return new SpaceDownState();
             default:
                 return this;
         }
@@ -327,7 +329,9 @@ class MousedownOnItemState extends CanvasState {
 }
 
 
-class MousedownOnCanvasState extends CanvasState {
+class MousedownOnLaneState extends CanvasState {
+    private laneId: TId | null = null;
+
     transition(e: IEvent): CanvasState {
         switch (e.type) {
             case "mouseup":
@@ -340,6 +344,7 @@ class MousedownOnCanvasState extends CanvasState {
     }
 
     onEnter(e: IEvent): void {
+        this.laneId = e.detail.laneId;
         if (!e.detail.shiftKey) this.canvas.clearSelection();
     }
 }
@@ -470,6 +475,99 @@ class ResizeItemState extends CanvasState {
 
 class MarqueeSelectState extends CanvasState {
     transition(e: IEvent) {
-        return new ReadyState();
+        switch (e.type) {
+            case "mousemove":
+                this.resizeMarquee(e);
+                return this;
+            case "mouseup":
+            case "escape": // fallthrough
+                return new ReadyState();
+            default:
+                return this;
+        }
+    }
+
+    onEnter(e: IEvent): void {
+        this.canvas.root.setMarqueeOrigin(e.detail.canvasCoordinates);
+        this.canvas.root.showMarquee();
+    }
+
+    onExit(e: IEvent): void {
+        this.canvas.root.hideMarquee();
+    }
+
+    private resizeMarquee(e: IEvent): void {
+        this.canvas.root.resizeMarqueeBy(e.detail.movement);
+        for (let item of this.canvas.items.values()) {
+            // TODO: This is a dirty hack... move the parent/descendant getters to the canvas?
+            if (Object.is(item, this.canvas.root)) continue;
+            if (isRectangleInRectangle(item, this.canvas.root.marquee)) {
+                item.highlight();
+            } else {
+                item.highlight(0);
+            }
+        }
+    }
+}
+
+
+class PanState extends CanvasState {
+    constructor(laneId: TId) {
+        super();
+        this.laneId = laneId;
+    }
+
+    private laneId: TId | null;
+
+    transition(e: IEvent) {
+        switch (e.type) {
+            case "mousemove":
+                this.pan(e);
+                return this;
+            case "mouseup":
+            case "spaceup": // fallthrough
+            case "escape": // fallthrough
+                return new ReadyState();
+            default:
+                return this;
+        }
+    }
+
+    private pan(e: IEvent) {
+        for (let lane of this.canvas.lanes) {
+            if (lane.id === this.laneId) lane.panBy(e.detail.movement);
+            else lane.panBy({ x: e.detail.movement.x, y: 0 });
+        }
+    }
+
+    onEnter(): void {
+        this.canvas.root.css({ cursor: "grabbing" });
+    }
+
+    onExit(): void {
+        this.canvas.root.css({ cursor: "default" });
+    }
+}
+
+
+class SpaceDownState extends CanvasState {
+    transition(e: IEvent): CanvasState {
+        switch (e.type) {
+            case "mousedown:lane":
+            case "mousedown:item": // fallthrough
+                return new PanState(e.detail.laneId);
+            case "spaceup":
+                return new ReadyState();
+            default:
+                return this;
+        }
+    }
+
+    onEnter(): void {
+        this.canvas.root.css({ cursor: "grab" });
+    }
+
+    onExit(): void {
+        this.canvas.root.css({ cursor: "default" });
     }
 }
