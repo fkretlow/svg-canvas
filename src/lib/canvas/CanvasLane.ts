@@ -1,32 +1,32 @@
-import { CanvasItem } from "./CanvasItem";
+import type { CanvasItem } from "./CanvasItem";
 import { createSVGElement } from "./../util";
-import { transformWindowToSVGCoordinates } from "./../util";
 
 
-export class CanvasLane extends CanvasItem {
-    constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
-        super(getItem);
+export class CanvasLane {
+    constructor(truth: any) {
         this.truth = truth;
 
         this.svg = this.createSVGElement();
         this.rectElement = this.createRectElement();
         this.svg.appendChild(this.rectElement);
+
         this.itemGroupElement = this.createItemGroupElement();
         this.svg.appendChild(this.itemGroupElement);
+
         this.setupEventListeners();
+
         this.update();
+        this.height = 500;
     }
 
-    private readonly truth: ICanvasSourceItem;
+    private readonly truth: any;
     public get element(): SVGElement { return this.svg; }
     public readonly svg: SVGSVGElement;
     public readonly rectElement: SVGRectElement;
     public readonly itemGroupElement: SVGGElement;
 
     public get id(): TId { return this.truth.id; }
-    public readonly parentId = null;
-
-    public get childIds(): Iterable<TId> { return this.truth.childIds; }
+    public get itemIds(): Iterable<TId> { return this.truth.itemIds; }
 
     private createSVGElement(): SVGSVGElement {
         const svg = createSVGElement("svg") as SVGSVGElement;
@@ -56,24 +56,17 @@ export class CanvasLane extends CanvasItem {
                     eventType: type + ":lane",
                     targetId: this.id,
                 };
-                const laneCoordinates = transformWindowToSVGCoordinates(this.rectElement, e, false);
-                laneCoordinates.x -= this.panOffset.x;
-                laneCoordinates.y -= this.panOffset.y;
 
                 Object.assign(e["canvasEventDetail"], {
                     laneId: this.id,
-                    laneCoordinates,
                 });
             });
         });
     }
 
     public update(): CanvasLane {
-        this.y = this.truth.y;
-        this.height = this.truth.height;
         this.name = this.truth.name;
         this.color = this.truth.color;
-        for (let child of this.getChildren()) child.update();
         return this;
     }
 
@@ -83,9 +76,8 @@ export class CanvasLane extends CanvasItem {
         this._selected = b;
     }
 
-    public mountChild(id: TId): CanvasLane {
-        const child = this.getItem(id);
-        this.itemGroupElement.appendChild(child.element);
+    public mountItem(item: ICanvasItem): CanvasLane {
+        this.itemGroupElement.appendChild(item.element);
         return this;
     }
 
@@ -98,15 +90,15 @@ export class CanvasLane extends CanvasItem {
         return this;
     }
 
-    public panBy(movement: IPoint): CanvasLane {
+    public panBy(movement: IPoint, vertically = false): CanvasLane {
         this.panOffset = {
             x: this.panOffset.x + movement.x,
-            y: this.panOffset.y + movement.y,
+            y: vertically ? this.panOffset.y + movement.y : this.panOffset.y,
         }
         return this;
     }
 
-    public moveTo(pos: IPoint): CanvasLane {
+    public setCoordinates(pos: IPoint): CanvasLane {
         this.y = pos.y;
         return this;
     }
@@ -127,14 +119,16 @@ export class CanvasLane extends CanvasItem {
         this._name = name;
     }
 
+    private _y: number = 0;
     public get y(): number { return this._y; }
-    private set y(y: number) {
+    public set y(y: number) {
         this._y = y
         this.svg.setAttribute("y", `${y}px`);
     }
 
+    private _height: number = 0;
     public get height(): number { return this._height; }
-    private set height(height: number) {
+    public set height(height: number) {
         this._height = height
         this.svg.setAttribute("height", `${height}px`);
     }

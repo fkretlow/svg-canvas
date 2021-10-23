@@ -4,8 +4,8 @@ import { createSVGElement } from "./../util";
 
 
 export class CanvasBlock extends CanvasItem {
-    constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
-        super(getItem);
+    constructor(truth: ICanvasSourceItem) {
+        super();
         this.truth = truth;
 
         this.containerElement = this.createContainerElement();
@@ -75,7 +75,6 @@ export class CanvasBlock extends CanvasItem {
         this.color = this.truth.color;
         this.name = this.truth.name;
         this.overlay.update(this);
-        for (let child of this.getChildren()) child.update();
         return this;
     }
 
@@ -126,7 +125,7 @@ export class CanvasBlock extends CanvasItem {
         this.unmount();
     }
 
-    public moveTo(pos: IPoint): CanvasBlock {
+    public setCoordinates(pos: IPoint): CanvasBlock {
         this.x = pos.x;
         this.y = pos.y;
         this.overlay.update(this);
@@ -151,11 +150,13 @@ export class CanvasBlock extends CanvasItem {
         } else if (level === 1) {
             this.showOverlay({
                 strokeWidth: 1,
+                strokeOpacity: .6,
                 showHandles: false,
             });
         } else {
             this.showOverlay({
-                strokeWidth: 2,
+                strokeWidth: 1,
+                strokeOpacity: 1,
                 showHandles: true,
             });
         }

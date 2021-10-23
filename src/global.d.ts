@@ -118,16 +118,8 @@ interface ICanvasItem {
     readonly element: SVGElement;
 
     laneId?: TId;
-    parentId: TId;
-    childIds: Iterable<TId>;
-    getChildren(): Generator<ICanvasItem>;
-    getDescendants(): Generator<ICanvasItem>;
-    getAncestors(): Generator<ICanvasItem>;
-    getDepth(): number;
-    getHeight(): number;
-    getRoot(): ICanvasItem;
-
-    getPanOffset?(): IPoint;
+    parentId?: TId;
+    childIds?: Iterable<TId>;
 
     mount(parent: Element): ICanvasItem;
     unmount(): ICanvasItem;
@@ -147,7 +139,7 @@ interface ICanvasItem {
 
     readonly x: number;
     readonly y: number;
-    moveTo?(pos: IPoint): ICanvasItem;
+    setCoordinates?(pos: IPoint): ICanvasItem;
     moveBy?(delta: IPoint): ICanvasItem;
 
     readonly width: number;
@@ -170,6 +162,7 @@ interface ICanvasOverlayOptions {
     stroke: string;
     fill: string;
     fillOpacity: number;
+    strokeOpacity: number;
     showHandles: boolean;
     strokeWidth: number;
 }

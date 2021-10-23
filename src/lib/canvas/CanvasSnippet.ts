@@ -5,8 +5,8 @@ import { DEFAULT_FONT_STYLE, TextBlock } from "./text";
 
 
 export class CanvasSnippet extends CanvasItem {
-    constructor(getItem: TCanvasItemGetter, truth: ICanvasSourceItem) {
-        super(getItem);
+    constructor(truth: ICanvasSourceItem) {
+        super();
         this.truth = truth;
 
         this.textBlock = new TextBlock();
@@ -96,10 +96,10 @@ export class CanvasSnippet extends CanvasItem {
         this.unmount();
     }
 
-    public moveTo(pos: IPoint): CanvasSnippet {
+    public setCoordinates(pos: IPoint): CanvasSnippet {
         this.x = pos.x;
         this.y = pos.y;
-        this.textBlock.moveTo(pos);
+        this.textBlock.setCoordinates(pos);
         this.overlay.update(this);
         return this;
     }
@@ -124,11 +124,13 @@ export class CanvasSnippet extends CanvasItem {
         } else if (level === 1) {
             this.showOverlay({
                 strokeWidth: 1,
+                strokeOpacity: .6,
                 showHandles: false,
             });
         } else {
             this.showOverlay({
-                strokeWidth: 2,
+                strokeWidth: 1,
+                strokeOpacity: 1,
                 showHandles: true,
             });
         }

@@ -6,9 +6,11 @@ import {isPointInRectangle} from "./util";
 
 export class Model implements IEventSource {
     constructor() {
-        this.addLane({ y: 0, height: 500 });
-        this.addLane({ y: 500, height: 500 });
+        this.addLane({ name: "Lane 1" });
+        this.addLane({ name: "Lane 2" });
         this.addItem({ type: "snippet", x: 50, y: 60 });
+        this.addItem({ type: "snippet", x: 70, y: 150 });
+        this.addItem({ type: "snippet", x: 200, y: 30 });
     }
 
     public readonly lanes = new Array<Lane>();
@@ -48,13 +50,11 @@ export class Model implements IEventSource {
 
     public addLane(data: {
         id?: TId,
-        y: number,
-        height?: number,
+        name?: string,
         color?: string,
     }) {
         const lane = new Lane(data);
         this.lanes.push(lane);
-        this.lanes.sort((l1,l2) => l1.y - l2.y);
     }
 
     public insertIntoLane(childId: TId, laneId: TId) {
@@ -212,20 +212,16 @@ export class Lane {
 
     constructor(data: {
         id?: TId,
-        y: number,
-        height?: number,
         name?: string,
+        color?: string,
     }) {
-        this.y = data.y;
         if (data.id) this.id = data.id;
-        if (data.height) this.height = data.height;
         if (data.name) this.name = data.name;
+        if (data.color) this.color = data.color;
     }
 
     id = uuid();
     itemIds: TId[] = [];
     name: string = "Lane";
-    y: number;
-    height: number = 500;
     color = "gray";
 }

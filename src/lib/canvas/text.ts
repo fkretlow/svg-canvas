@@ -79,9 +79,9 @@ export class TextBlock {
         this.wrap();
     }
 
-    public moveTo(pos: IPoint): TextBlock {
-        this.x = pos.x;
-        this.y = pos.y;
+    public setCoordinates(coordinates: IPoint): TextBlock {
+        this.x = coordinates.x;
+        this.y = coordinates.y;
         return this;
     }
 

@@ -4,16 +4,15 @@ import { CanvasBlock } from "./CanvasBlock";
 import { CanvasLane } from "./CanvasLane";
 import { CanvasRoot } from "./CanvasRoot";
 import { StateMachine, State } from "./StateMachine";
-import {isRectangleInRectangle} from "$lib/util";
+import { isRectangleInRectangle } from "$lib/util";
 
 
 
 export class Canvas implements ICanvas, IEventListener {
     constructor(parent: HTMLElement | null, options?: Partial<ICanvasOptions>) {
         this.setupGlobalEventHandlers();
-        this.root = new CanvasRoot((id: TId) => this.getItem(id));
+        this.root = new CanvasRoot();
         this.connectRootEventHandlers(this.root);
-        this.registerItem(this.root);
         if (options) this.setOptions(options);
         if (parent) this.mount(parent);
     }
@@ -23,33 +22,90 @@ export class Canvas implements ICanvas, IEventListener {
     readonly options: ICanvasOptions = {};
 
     /*
-     * Event Handling
-     */
-    protected eventTargetMixin = new EventTargetMixin();
-    public async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
-        this.eventTargetMixin.emitEvent(type, detail);
-    }
-    public on(type: string, handler: TMouseEventHandler): Canvas {
-        this.eventTargetMixin.on(type, handler);
-        return this;
-    }
-    public off(type: string, handler?: Function): Canvas {
-        this.eventTargetMixin.off(type, handler);
-        return this;
-    }
-
-    /*
      * Item registry
      */
     public readonly items = new Map<TId, ICanvasItem>();
-    public getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
     private registerItem(item: ICanvasItem): void { this.items.set(item.id, item); }
     private unregisterItem(id: TId): boolean { return this.items.delete(id); }
+    public getItem(id: TId): ICanvasItem | null { return this.items.get(id) || null; }
+    public getAllItems(): Iterable<ICanvasItem> { return this.items.values(); }
+
+    public getParentOf(id: TId): ICanvasItem | null {
+        const item = this.getItem(id);
+        if (item === null)
+            throw new Error(`Canvas.getParentOf: item not found`);
+        return item.parentId ? this.getItem(item.parentId) : null;
+    }
+
+    public *getChildrenOf(id: TId): Generator<ICanvasItem> {
+        const item = this.getItem(id);
+        if (item === null)
+            throw new Error(`Canvas.getChildrenOf: item not found`);
+        if (item.childIds) {
+            for (let childId of item.childIds) {
+                yield this.getItem(childId);
+            }
+        }
+    }
+
+    public *getDescendantsOf(id: TId): Generator<ICanvasItem> {
+        const item = this.getItem(id);
+        if (item === null)
+            throw new Error(`Canvas.getDescendantsOf: item not found`);
+        const children = Array.from(this.getChildrenOf(item.id));
+        for (let child of children) yield child;
+        for (let child of children) yield* this.getDescendantsOf(child.id);
+    }
+
+    public *getAncestorsOf(id: TId): Generator<ICanvasItem> {
+        const parent = this.getParentOf(id);
+        if (parent) {
+            yield parent;
+            yield* this.getAncestorsOf(parent.id);
+        }
+    }
+
+    public getItemDepth(id: TId): number {
+        let depth = 0;
+        for (let _ of this.getAncestorsOf(id)) ++depth;
+        return depth;
+    }
 
     /*
      * Lanes
      */
     public lanes = new Array<CanvasLane>();
+
+    public calculateOptimalLaneWindow(laneId: TId, options?: { minHeight?: number, maxHeight?: number, padding?: number }): { panOffsetY: number, height: number } {
+        const lane = this.getLane(laneId);
+        if (lane === null)
+            throw new Error(`Canvas.calculateOptimalLaneHeight: lane not found`);
+
+        let minHeight = options?.minHeight || -Infinity;
+        let maxHeight = options?.maxHeight || Infinity;
+        let padding = options?.padding || 30;
+
+        let empty = true;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (let itemId of lane.itemIds) {
+            empty = false;
+            const item = this.getItem(itemId);
+            minY = Math.min(minY, item.y);
+            maxY = Math.max(maxY, item.y + item.height);
+        }
+
+        let height = empty ? 350 : maxY - minY + 2 * padding;
+        if (maxHeight > 0) height = Math.min(height, maxHeight);
+        if (minHeight > 0) height = Math.max(height, minHeight);
+        let panOffsetY = empty ? 0 : -minY + padding;
+
+        return {
+            height,
+            panOffsetY,
+        };
+    }
 
     /*
      * Selection
@@ -107,6 +163,19 @@ export class Canvas implements ICanvas, IEventListener {
     public setTruth(truth: ICanvasTruth): Canvas {
         this.truth = truth;
         this.update();
+
+        let y: number = 0;
+        for (let lane of this.lanes) {
+            const { panOffsetY, height } = this.calculateOptimalLaneWindow(lane.id, { minHeight: 400, maxHeight: 600 });
+            lane.y = y;
+            lane.height = height;
+            lane.panOffset = {
+                x: lane.panOffset.x,
+                y: panOffsetY,
+            }
+            y += height;
+        }
+
         return this;
     }
 
@@ -117,8 +186,8 @@ export class Canvas implements ICanvas, IEventListener {
         }
 
         // add new items
-        for (let part of this.truth.elements.values()) {
-            if (!this.items.has(part.id)) this.addItem(part);
+        for (let trueItem of this.truth.elements.values()) {
+            if (!this.items.has(trueItem.id)) this.addItem(trueItem);
         }
 
         // remove deleted
@@ -129,7 +198,7 @@ export class Canvas implements ICanvas, IEventListener {
         }
 
         // update remaining
-        for (let item of this.items.values()) {
+        for (let item of this.getAllItems()) {
             item.update();
         }
 
@@ -137,9 +206,10 @@ export class Canvas implements ICanvas, IEventListener {
     }
 
     public addLane(source: ICanvasSourceItem): Canvas {
-        const lane = new CanvasLane(id => this.getItem(id), source);
+        const previousLane = this.lanes[this.lanes.length-1] || null;
+        const lane = new CanvasLane(source);
+        lane.setCoordinates({ x: 0, y: previousLane ? previousLane.y + previousLane.height : 0 });
         this.lanes.push(lane);
-        this.lanes.sort((l1,l2) => l1.y - l2.y);
         this.root.mountLane(lane);
         return this;
     }
@@ -162,16 +232,16 @@ export class Canvas implements ICanvas, IEventListener {
         let item: ICanvasItem;
 
         if (source.type === "block") {
-            item = new CanvasBlock(id => this.getItem(id), source);
+            item = new CanvasBlock(source);
         } else if (source.type === "snippet") {
-            item = new CanvasSnippet(id => this.getItem(id), source);
+            item = new CanvasSnippet(source);
         } else if (source.type === "lane") {
-            item = new CanvasLane(id => this.getItem(id), source);
+            throw new Error(`Canvas.addItem: we should not end up in the lane branch anymore`);
         }
 
         this.registerItem(item);
         const lane = this.getLane(item.laneId);
-        lane.mountChild(item.id);
+        lane.mountItem(item);
 
         return this;
     }
@@ -221,7 +291,12 @@ export class Canvas implements ICanvas, IEventListener {
 
     private connectRootEventHandlers(root: CanvasRoot): void {
         root.on("*", (e: IEvent) => {
-            e.detail.spaceKey = this.spaceKey;
+            if (e.detail.laneId && e.detail.canvasCoordinates) {
+                e.detail.laneCoordinates = this.transformCanvasToLaneCoordinates(
+                    e.detail.laneId,
+                    e.detail.canvasCoordinates
+                );
+            }
             this.machine.send(e);
         });
     }
@@ -238,8 +313,6 @@ export class Canvas implements ICanvas, IEventListener {
         });
     }
 
-    private spaceKey: boolean = false;
-
     /*
      * State machine
      */
@@ -249,6 +322,23 @@ export class Canvas implements ICanvas, IEventListener {
      * Incoming Domain Events
      */
     notify(event: IEvent) { this.update(); }
+
+    /*
+     * Event Handling
+     */
+    protected eventEmitter = new EventTargetMixin();
+    public async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
+        this.eventEmitter.emitEvent(type, detail);
+    }
+    public on(type: string, handler: TMouseEventHandler): Canvas {
+        this.eventEmitter.on(type, handler);
+        return this;
+    }
+    public off(type: string, handler?: Function): Canvas {
+        this.eventEmitter.off(type, handler);
+        return this;
+    }
+
 }
 
 
@@ -330,8 +420,6 @@ class MousedownOnItemState extends CanvasState {
 
 
 class MousedownOnLaneState extends CanvasState {
-    private laneId: TId | null = null;
-
     transition(e: IEvent): CanvasState {
         switch (e.type) {
             case "mouseup":
@@ -344,14 +432,13 @@ class MousedownOnLaneState extends CanvasState {
     }
 
     onEnter(e: IEvent): void {
-        this.laneId = e.detail.laneId;
         if (!e.detail.shiftKey) this.canvas.clearSelection();
     }
 }
 
 
 class DragItemState extends CanvasState {
-    private readonly items = new Set<ICanvasItem>();
+    private items = new Array<ICanvasItem>();
 
     transition(e: IEvent): CanvasState {
         switch (e.type) {
@@ -367,24 +454,31 @@ class DragItemState extends CanvasState {
     }
 
     onEnter(): void {
+        const items = new Set<ICanvasItem>();
         for (let selected of this.canvas.getSelectedItems()) {
-            this.items.add(selected);
-            for (let descendant of selected.getDescendants()) {
-                this.items.add(descendant);
+            items.add(selected);
+            for (let child of this.canvas.getDescendantsOf(selected.id)) {
+                items.add(child);
             }
         }
 
-        for (let item of this.items as Set<any>) {
+        /*
+         * Sort the items by depth in the tree before re-mounting them in the root to prevent
+         * messing up the stacking order.
+         */
+        this.items.push(...items);
+        this.items.sort((i1,i2) => this.canvas.getItemDepth(i1.id) - this.canvas.getItemDepth(i2.id));
+
+        for (let item of this.items) {
             item.unmount();
             const canvasCoordinates = this.canvas.transformLaneToCanvasCoordinates(item.laneId, { x: item.x, y: item.y });
-            item.moveTo(canvasCoordinates);
-            this.canvas.root.mountChild(item.id);
+            item.setCoordinates(canvasCoordinates);
+            this.canvas.root.mountItem(item);
         }
     }
 
     onExit(e: IEvent): void {
         const abort = e.type === "escape";
-
 
         /*
          * We can simply update all items because we haven't committed any model interaction.
@@ -394,12 +488,12 @@ class DragItemState extends CanvasState {
         else {
             const items: { id: TId, laneId: TId, laneCoordinates: IPoint }[] = [];
 
-            for (let item of this.items as Set<any>) {
+            for (let item of this.items) {
                 item.unmount();
                 const lane = this.canvas.getLaneAt({ x: item.x, y: item.y });
-                lane.mountChild(item.id);
                 const laneCoordinates = this.canvas.transformCanvasToLaneCoordinates(lane.id, { x: item.x, y: item.y });
-                item.moveTo(laneCoordinates);
+                lane.mountItem(item);
+                item.setCoordinates(laneCoordinates);
 
                 items.push({
                     id: item.id,
@@ -437,11 +531,13 @@ class ResizeItemState extends CanvasState {
     }
 
     onEnter(e: IEvent): void {
-        this.anchor = e.detail!.anchor;
-        this.target = this.canvas.getItem(e.detail!.targetId);
+        this.anchor = e.detail.anchor;
+        this.target = this.canvas.getItem(e.detail.targetId);
         this.canvas.deselectAllBut(this.target.id);
         this.target.moveToTheFront();
-        for (let descendant of this.target.getDescendants()) descendant.moveToTheFront();
+        for (let child of this.canvas.getDescendantsOf(this.target.id)) {
+            child.moveToTheFront();
+        }
     }
 
     onExit(e: IEvent): void {
@@ -474,6 +570,8 @@ class ResizeItemState extends CanvasState {
 
 
 class MarqueeSelectState extends CanvasState {
+    private selectedItems = new Set<TId>();
+
     transition(e: IEvent) {
         switch (e.type) {
             case "mousemove":
@@ -494,16 +592,30 @@ class MarqueeSelectState extends CanvasState {
 
     onExit(e: IEvent): void {
         this.canvas.root.hideMarquee();
+
+        if (e.type === "escape") {
+            for (let id of this.selectedItems) {
+                const item = this.canvas.getItem(id);
+                item.highlight(0);
+            }
+        } else {
+            this.canvas.clearSelection();
+            for (let id of this.selectedItems) {
+                this.canvas.select(id, true);
+            }
+        }
     }
 
     private resizeMarquee(e: IEvent): void {
         this.canvas.root.resizeMarqueeBy(e.detail.movement);
-        for (let item of this.canvas.items.values()) {
-            // TODO: This is a dirty hack... move the parent/descendant getters to the canvas?
-            if (Object.is(item, this.canvas.root)) continue;
-            if (isRectangleInRectangle(item, this.canvas.root.marquee)) {
+        for (let item of this.canvas.getAllItems()) {
+            const { x, y } = this.canvas.transformLaneToCanvasCoordinates(item.laneId, item);
+            const rect = { x, y, width: item.width, height: item.height };
+            if (isRectangleInRectangle(rect, this.canvas.root.marquee)) {
+                this.selectedItems.add(item.id);
                 item.highlight();
             } else {
+                this.selectedItems.delete(item.id);
                 item.highlight(0);
             }
         }
@@ -518,15 +630,20 @@ class PanState extends CanvasState {
     }
 
     private laneId: TId | null;
+    private spaceWasReleased = false;
 
     transition(e: IEvent) {
         switch (e.type) {
             case "mousemove":
                 this.pan(e);
                 return this;
+            case "spaceup":
+                this.spaceWasReleased = true;
+                return this;
             case "mouseup":
-            case "spaceup": // fallthrough
-            case "escape": // fallthrough
+                if (this.spaceWasReleased) return new ReadyState();
+                else return new SpaceDownState();
+            case "escape":
                 return new ReadyState();
             default:
                 return this;
@@ -535,8 +652,8 @@ class PanState extends CanvasState {
 
     private pan(e: IEvent) {
         for (let lane of this.canvas.lanes) {
-            if (lane.id === this.laneId) lane.panBy(e.detail.movement);
-            else lane.panBy({ x: e.detail.movement.x, y: 0 });
+            const vertically = lane.id === this.laneId;
+            lane.panBy(e.detail.movement, vertically);
         }
     }
 

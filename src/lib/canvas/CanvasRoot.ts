@@ -1,13 +1,11 @@
-import { v4 as uuid } from "uuid";
-import { CanvasItem } from "./CanvasItem";
+import type { CanvasLane } from "./CanvasLane";
 import { EventTargetMixin } from "./../events";
 import { createSVGElement, transformWindowToSVGCoordinates } from "./../util";
 import { MarqueeOverlay } from "./Overlay";
 
 
-export class CanvasRoot extends CanvasItem implements IEventTarget {
-    constructor(getItem: TCanvasItemGetter) {
-        super(getItem);
+export class CanvasRoot implements IEventTarget {
+    constructor() {
         this.element = this.createSVGElement();
         this.laneGroupElement = this.createLaneGroupElement();
         this.element.appendChild(this.laneGroupElement);
@@ -17,15 +15,11 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
         this.element.appendChild(this.overlayGroupElement);
     }
 
-    readonly id: TId = uuid();
-    readonly parentId = null;
-    readonly childIds = null;
     readonly element: SVGElement;
     readonly itemGroupElement: SVGGElement;
     readonly laneGroupElement: SVGGElement;
     readonly overlayGroupElement: SVGGElement;
     readonly marquee = new MarqueeOverlay();
-    protected readonly getItem: TCanvasItemGetter;
 
     destroy() {}
     update() { return this; }
@@ -44,20 +38,13 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
         return this;
     }
 
-    mountLane(lane: ICanvasItem): CanvasRoot {
+    mountLane(lane: CanvasLane): CanvasRoot {
         this.laneGroupElement.appendChild(lane.element);
         return this;
     }
 
-    mountChild(id: TId): CanvasRoot {
-        const child = this.getItem(id);
-        this.itemGroupElement.appendChild(child.element);
-        return this;
-    }
-
-    unmountChild(id: TId): CanvasRoot {
-        const item = this.getItem(id);
-        this.itemGroupElement.removeChild(item.element);
+    mountItem(item: ICanvasItem): CanvasRoot {
+        this.itemGroupElement.appendChild(item.element);
         return this;
     }
 
@@ -137,11 +124,11 @@ export class CanvasRoot extends CanvasItem implements IEventTarget {
     protected async emitEvent(type: TEventType, detail?: TEventDetail): Promise<void> {
         return this.eventTargetMixin.emitEvent(type, detail);
     }
-    public on(type: string, handler: TMouseEventHandler): CanvasItem {
+    public on(type: string, handler: TMouseEventHandler): CanvasRoot {
         this.eventTargetMixin.on(type, handler);
         return this;
     }
-    public off(type: string, handler?: Function): CanvasItem {
+    public off(type: string, handler?: Function): CanvasRoot {
         this.eventTargetMixin.off(type, handler);
         return this;
     }

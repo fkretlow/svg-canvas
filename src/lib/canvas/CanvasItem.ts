@@ -1,55 +1,8 @@
 export abstract class CanvasItem implements ICanvasItem {
-    constructor(getItem: TCanvasItemGetter) {
-        this.getItem = getItem;
-    }
-
     abstract readonly id: TId;
     abstract readonly element: SVGElement;
     abstract parentId: TId | null;
     abstract childIds: Iterable<TId> | null;
-
-    protected getItem: TCanvasItemGetter;
-    public getParent(): ICanvasItem | null {
-        return this.parentId ? this.getItem(this.parentId) : null;
-    }
-
-    public *getChildren(): Generator<ICanvasItem> {
-        if (this.childIds) {
-            for (let id of this.childIds) yield this.getItem(id);
-        }
-    }
-
-    public *getDescendants(): Generator<ICanvasItem> {
-        if (this.childIds) {
-            for (let child of this.getChildren()) yield child;
-            for (let child of this.getChildren()) yield* child.getDescendants();
-        }
-    }
-
-    public *getAncestors(): Generator<ICanvasItem> {
-        const parent = this.getParent();
-        if (parent) {
-            yield parent;
-            yield* parent.getAncestors();
-        }
-    }
-
-    public getDepth(): number {
-        let depth = 0;
-        for (let _ of this.getAncestors()) ++depth;
-        return depth;
-    }
-
-    public getHeight(): number {
-        let height = 0;
-        for (let _ of this.getDescendants()) ++height;
-        return height;
-    }
-
-    public getRoot(): ICanvasItem {
-        const parent = this.getParent();
-        return parent ? parent.getRoot() : this;
-    }
 
     public destroy(): void {
         this.unmount();
@@ -100,9 +53,9 @@ export abstract class CanvasItem implements ICanvasItem {
         this._height = height
     }
 
-    public moveTo(pos: IPoint): CanvasItem {
-        this.x = pos.x;
-        this.y = pos.y;
+    public setCoordinates(coordinates: IPoint): CanvasItem {
+        this.x = coordinates.x;
+        this.y = coordinates.y;
         return this;
     }
 
