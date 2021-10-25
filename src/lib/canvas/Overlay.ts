@@ -33,8 +33,6 @@ export class Overlay {
     }
 
     public update(target: IRectangle): Overlay {
-        this.rectElement.setAttribute("x", `${target.x}px`);
-        this.rectElement.setAttribute("y", `${target.y}px`);
         this.rectElement.setAttribute("width", `${target.width}px`);
         this.rectElement.setAttribute("height", `${target.height}px`);
         return this;
@@ -82,17 +80,13 @@ export class ResizeOverlay extends Overlay {
     }
 
     public update(target: IRectangle): Overlay {
-        this.rectElement.setAttribute("x", `${target.x}px`);
-        this.rectElement.setAttribute("y", `${target.y}px`);
         this.rectElement.setAttribute("width", `${target.width}px`);
         this.rectElement.setAttribute("height", `${target.height}px`);
 
         ResizeOverlay.anchors.forEach(anchor => {
             const handle = this.handles.get(anchor);
-            const x = isWest(anchor) ? target.x : target.x + target.width;
-            const y = isNorth(anchor) ? target.y : target.y + target.height;
-            handle.setAttribute("cx", `${x}px`);
-            handle.setAttribute("cy", `${y}px`);
+            if (isEast(anchor)) handle.setAttribute("cx", `${target.width}px`);
+            if (isSouth(anchor)) handle.setAttribute("cy", `${target.height}px`);
         })
 
         return this;

@@ -1,5 +1,5 @@
 import { CanvasItem } from "./CanvasItem";
-import { createSVGElement, transformWindowToSVGCoordinates } from "./../util";
+import { createSVGElement } from "./../util";
 import { Overlay } from "./Overlay";
 import { DEFAULT_FONT_STYLE, TextBlock } from "./text";
 
@@ -99,7 +99,6 @@ export class CanvasSnippet extends CanvasItem {
     public setCoordinates(pos: IPoint): CanvasSnippet {
         this.x = pos.x;
         this.y = pos.y;
-        this.textBlock.setCoordinates(pos);
         this.overlay.update(this);
         return this;
     }
@@ -107,7 +106,6 @@ export class CanvasSnippet extends CanvasItem {
     public moveBy(delta: IPoint): CanvasSnippet {
         this.x += delta.x;
         this.y += delta.y;
-        this.textBlock.moveBy(delta);
         this.overlay.update(this);
         return this;
     }
@@ -166,13 +164,13 @@ export class CanvasSnippet extends CanvasItem {
     public get x(): number { return this._x; }
     private set x(x: number) {
         this._x = x
-        this.rectElement.setAttribute("x", `${x}px`);
+        this.containerElement.setAttribute("transform", `translate(${this._x} ${this._y})`);
     }
 
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y
-        this.rectElement.setAttribute("y", `${y}px`);
+        this.containerElement.setAttribute("transform", `translate(${this._x} ${this._y})`);
     }
 
     public get width(): number { return this._width; }

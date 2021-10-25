@@ -68,11 +68,11 @@ export const DEFAULT_FONT_STYLE: IFontStyle = {
 export class TextBlock {
     constructor() {
         this.containerElement = this.createContainerElement();
+        this.x = 0;
+        this.y = 0;
     }
 
     public update(text: string, shape: IRectangle) {
-        this.x = shape.x;
-        this.y = shape.y;
         this.width = shape.width;
         this.height = shape.height;
         this.text = text;
@@ -135,8 +135,8 @@ export class TextBlock {
             const text = createSVGElement("text");
             text.textContent = line;
             text.setAttribute("fill", "black");
-            text.setAttribute("x", `${this.x + this.padding.left}px`);
-            text.setAttribute("y", `${this.y + ascent + this.padding.top}px`);
+            text.setAttribute("x", `${this.padding.left}px`);
+            text.setAttribute("y", `${ascent + this.padding.top}px`);
             text.setAttribute("dy", `${i * this.style["line-height"]}px`);
             this.containerElement.appendChild(text);
         }
@@ -160,7 +160,7 @@ export class TextBlock {
     public get style(): IFontStyle { return this._style; }
     public set style(style: IFontStyle) { this._style = style; }
 
-    private _x: number = 0;
+    private _x: number;
     public get x(): number { return this._x; }
     private set x(x: number) {
         this._x = x;
@@ -170,7 +170,7 @@ export class TextBlock {
         }
     }
 
-    private _y: number = 0;
+    private _y: number;
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y;
@@ -178,7 +178,7 @@ export class TextBlock {
         const ascent = measureText(this.lines[0], this.style).actualBoundingBoxAscent;
         for (let i = 0; i < this.containerElement.children.length; ++i) {
             const text = this.containerElement.children[i];
-            text.setAttribute("y", `${y + ascent + this.padding.top}px`);
+            text.setAttribute("y", `${ascent + this.padding.top}px`);
         }
     }
 

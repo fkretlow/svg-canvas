@@ -1,6 +1,7 @@
 import { CanvasItem } from "./CanvasItem";
 import { ResizeOverlay, isWest, isNorth, isEast, isSouth } from "./Overlay";
 import { createSVGElement } from "./../util";
+import {DEFAULT_FONT_STYLE, measureText} from "./text";
 
 
 export class CanvasBlock extends CanvasItem {
@@ -10,11 +11,23 @@ export class CanvasBlock extends CanvasItem {
 
         this.containerElement = this.createContainerElement();
         this.rectElement = this.createRectElement();
+        this.tabElement = this.createTabElement();
+        this.nameElement = this.createNameElement();
+
+        this.containerElement.appendChild(this.tabElement);
         this.containerElement.appendChild(this.rectElement);
+        this.tabElement.appendChild(this.nameElement);
 
         this.overlay = new ResizeOverlay();
         this.setupEventListeners();
     }
+
+    private readonly containerElement: SVGGElement;
+    private readonly rectElement: SVGRectElement;
+    private readonly tabElement: SVGGElement;
+    private readonly nameElement: SVGTextElement;
+    private overlay: ResizeOverlay;
+
 
     private readonly truth: ICanvasSourceItem;
 
@@ -42,8 +55,36 @@ export class CanvasBlock extends CanvasItem {
     private createRectElement(): SVGRectElement {
         const rect = createSVGElement("rect") as SVGRectElement;
         rect.dataset.refId = this.id;
-        rect.style.setProperty("stroke", "rgba(0,0,0,.3)");
+        rect.setAttribute("stroke", "#444");
+        rect.setAttribute("stroke-width", "0.75");
         return rect;
+    }
+
+    private tabElementSize: ISize = { width: 80, height: 20 };
+
+    private createTabElement(): SVGGElement {
+        const g = createSVGElement("g") as SVGGElement;
+        const tab = createSVGElement("rect") as SVGRectElement;
+        tab.setAttribute("width", `${this.tabElementSize.width}`);
+        tab.setAttribute("height", `${this.tabElementSize.height}`);
+        tab.setAttribute("fill", "#888");
+        tab.setAttribute("stroke", "#444");
+        tab.setAttribute("stroke-width", "0.75");
+        tab.setAttribute("transform", `translate(0 ${-this.tabElementSize.height})`);
+        g.appendChild(tab);
+        return g;
+    }
+
+    private createNameElement(): SVGTextElement {
+        const text = createSVGElement("text") as SVGTextElement;
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("fill", "white");
+        text.setAttribute("x", `${this.tabElementSize.width / 2}`);
+        text.setAttribute("y", `${-this.tabElementSize.height / 2}`);
+        for (let [ prop, value ] of Object.entries(DEFAULT_FONT_STYLE)) {
+            text.style.setProperty(prop, value);
+        }
+        return text;
     }
 
     private setupEventListeners(): void {
@@ -178,26 +219,25 @@ export class CanvasBlock extends CanvasItem {
         return this.containerElement;
     }
 
-    private readonly containerElement: SVGGElement;
-    private readonly rectElement: SVGRectElement;
-    private overlay: ResizeOverlay;
-
     private _name: string = "";
     public get name(): string { return this._name; }
     private set name(name: string) {
         this._name = name;
+        this.nameElement.textContent = name;
+        const metrics = measureText(name);
+        this.nameElement.setAttribute("dy", `${(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) / 2}`);
     }
 
     public get x(): number { return this._x; }
     private set x(x: number) {
-        this._x = x
-        this.rectElement.setAttribute("x", `${x}px`);
+        this._x = x;
+        this.containerElement.setAttribute("transform", `translate(${this._x} ${this._y})`);
     }
 
     public get y(): number { return this._y; }
     private set y(y: number) {
         this._y = y
-        this.rectElement.setAttribute("y", `${y}px`);
+        this.containerElement.setAttribute("transform", `translate(${this._x} ${this._y})`);
     }
 
     public get width(): number { return this._width; }

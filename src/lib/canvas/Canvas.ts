@@ -112,6 +112,14 @@ export class Canvas implements ICanvas, IEventListener {
      */
     public readonly selection = new Set<TId>();
 
+    public hasSelection(): boolean {
+        return this.selection.size > 0;
+    }
+
+    public isSelected(id: TId): boolean {
+        return this.selection.has(id);
+    }
+
     public select(id: TId, multiple: boolean = false): Canvas {
         const item = this.getItem(id);
         if (!item) throw new Error(`Canvas.select: item not found`);
@@ -599,7 +607,6 @@ class MarqueeSelectState extends CanvasState {
                 item.highlight(0);
             }
         } else {
-            this.canvas.clearSelection();
             for (let id of this.selectedItems) {
                 this.canvas.select(id, true);
             }
@@ -616,7 +623,7 @@ class MarqueeSelectState extends CanvasState {
                 item.highlight();
             } else {
                 this.selectedItems.delete(item.id);
-                item.highlight(0);
+                if (!this.canvas.isSelected(item.id)) item.highlight(0);
             }
         }
     }
